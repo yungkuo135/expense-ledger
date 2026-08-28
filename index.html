@@ -1,0 +1,3096 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>記帳本</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Noto+Sans+TC:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper: #F3EFE6;
+    --paper-dark: #E9E3D4;
+    --ink: #2B2A26;
+    --ink-soft: #6B6558;
+    --line: #CFC7B2;
+    --stamp: #B4342A;
+    --warn: #B4772A;
+    --warn-bg: #F3E2C9;
+    --ok: #4C6B4F;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'Noto Sans TC', sans-serif;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .app{
+    max-width:480px;
+    margin:0 auto;
+    padding:20px 16px 100px;
+    min-height:100vh;
+  }
+
+  header{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    padding-bottom:14px;
+    margin-bottom:6px;
+    border-bottom: 2px dashed var(--line);
+  }
+  .title{
+    font-family:'Space Mono', monospace;
+    font-size:13px;
+    letter-spacing:2px;
+    color:var(--ink-soft);
+    text-transform:uppercase;
+  }
+  .title strong{
+    display:block;
+    font-family:'Noto Sans TC', sans-serif;
+    font-size:22px;
+    font-weight:700;
+    letter-spacing:0;
+    color:var(--ink);
+    margin-top:2px;
+  }
+  .stamp{
+    width:66px; height:66px;
+    border-radius:50%;
+    border:2.5px solid var(--stamp);
+    color:var(--stamp);
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    transform:rotate(-8deg);
+    font-family:'Space Mono', monospace;
+    flex-shrink:0;
+    position:relative;
+  }
+  .stamp::before{
+    content:"";
+    position:absolute;
+    inset:5px;
+    border-radius:50%;
+    border:1px solid var(--stamp);
+    opacity:0.55;
+  }
+  .stamp .label{ font-size:8px; letter-spacing:1px; margin-bottom:1px;}
+  .stamp .amt{ font-size:14px; font-weight:700; line-height:1;}
+
+  .needs-action-section{
+    margin-top:18px;
+    padding-bottom:14px;
+    border-bottom:2px dashed var(--line);
+  }
+  .needs-action-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    font-family:'Space Mono', monospace;
+    font-size:13px;
+    font-weight:700;
+    color:var(--warn);
+    letter-spacing:1px;
+    margin-bottom:10px;
+  }
+  .batch-confirm-btn{
+    font-family:'Noto Sans TC', sans-serif;
+    letter-spacing:0;
+    background:var(--warn);
+    color:#fff9ee;
+    border:none;
+    border-radius:7px;
+    font-size:12px;
+    font-weight:700;
+    padding:6px 11px;
+    cursor:pointer;
+  }
+  .batch-confirm-btn:active{ transform:scale(0.97); }
+
+  .month-section{ margin-bottom:10px; }
+  .month-head{
+    display:flex;
+    align-items:baseline;
+    gap:7px;
+    padding:12px 2px;
+    cursor:pointer;
+    border-bottom:1.5px solid var(--line);
+    margin-bottom:14px;
+  }
+  .month-toggle{
+    font-size:11px;
+    color:var(--ink-soft);
+    width:12px;
+    flex-shrink:0;
+  }
+  .month-label{
+    font-family:'Space Mono', monospace;
+    font-size:15px;
+    font-weight:800;
+    color:var(--ink);
+    flex:1;
+  }
+  .month-total{
+    font-family:'Space Mono', monospace;
+    font-size:14px;
+    font-weight:700;
+    color:var(--ink-soft);
+  }
+  /* 待確認 section's month headers share .month-head's layout/spacing for
+     visual consistency with the main ledger, but tint toward the section's
+     warning color instead of the neutral ink tone, and the trailing figure
+     is an item count (not a $ total) — different unit, different label. */
+  .action-month-head{ border-bottom-color:var(--warn-bg); }
+  .action-month-head .month-label{ color:var(--warn); }
+  .action-month-count{
+    font-size:12px;
+    font-weight:600;
+    color:var(--warn);
+  }
+
+  .entry-form{
+    margin-top:18px;
+    background:#fff9ee;
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:16px;
+    box-shadow: 0 2px 0 var(--line);
+  }
+  .amount-row{
+    display:flex;
+    align-items:baseline;
+    gap:6px;
+    border-bottom:1px solid var(--line);
+    padding-bottom:10px;
+    margin-bottom:14px;
+  }
+  .amount-row span{
+    font-family:'Space Mono', monospace;
+    font-size:22px;
+    color:var(--ink-soft);
+  }
+  .amount-row input{
+    flex:1;
+    border:none;
+    background:transparent;
+    font-family:'Space Mono', monospace;
+    font-size:32px;
+    font-weight:700;
+    color:var(--ink);
+    outline:none;
+    min-width:0;
+  }
+  .amount-row input::placeholder{ color:#C9C2AD; }
+
+  .chip-row{
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+    margin-bottom:14px;
+  }
+  .chip{
+    padding:7px 13px;
+    border-radius:999px;
+    border:1.5px solid var(--line);
+    background:transparent;
+    color:var(--ink-soft);
+    font-size:13.5px;
+    font-weight:500;
+    cursor:pointer;
+    transition:all .12s ease;
+  }
+  .chip.active{
+    background:var(--ink);
+    border-color:var(--ink);
+    color:var(--paper);
+  }
+
+  .note-row{ margin-bottom:14px; }
+  .note-row input{
+    width:100%;
+    border:none;
+    border-bottom:1px solid var(--line);
+    background:transparent;
+    font-family:'Noto Sans TC', sans-serif;
+    font-size:14px;
+    color:var(--ink);
+    padding:6px 2px;
+    outline:none;
+  }
+  .note-row input::placeholder{ color:#B7AF98; }
+
+  .date-row{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    margin-bottom:14px;
+  }
+  .date-row label{
+    font-size:13px;
+    color:var(--ink-soft);
+    flex-shrink:0;
+  }
+  .date-row input[type="date"]{
+    flex:1;
+    min-width:0;
+    border:none;
+    border-bottom:1px solid var(--line);
+    background:transparent;
+    font-family:'Noto Sans TC', sans-serif;
+    font-size:14px;
+    color:var(--ink);
+    padding:6px 2px;
+    outline:none;
+  }
+
+  .save-btn{
+    width:100%;
+    padding:14px;
+    border:none;
+    border-radius:10px;
+    background:var(--stamp);
+    color:#fff9ee;
+    font-family:'Noto Sans TC', sans-serif;
+    font-size:16px;
+    font-weight:700;
+    letter-spacing:1px;
+    cursor:pointer;
+  }
+  .save-btn:active{ transform:scale(0.98); }
+  .save-btn:disabled{ background:#C9C2AD; }
+
+  /* import section */
+  .import-section{
+    margin-top:16px;
+    display:flex;
+    gap:10px;
+  }
+  .import-btn{
+    flex:1;
+    text-align:center;
+    padding:12px 8px;
+    border:1.5px dashed var(--line);
+    border-radius:10px;
+    color:var(--ink-soft);
+    font-size:12.5px;
+    font-weight:600;
+    cursor:pointer;
+    line-height:1.4;
+  }
+  .import-btn input{ display:none; }
+  .bank-label-row{ margin-top:10px; }
+  .bank-label-row input{
+    width:100%;
+    border:1.5px solid var(--line);
+    border-radius:8px;
+    background:transparent;
+    font-family:'Noto Sans TC', sans-serif;
+    font-size:13px;
+    color:var(--ink);
+    padding:9px 10px;
+    outline:none;
+  }
+  .bank-label-row input::placeholder{ color:#B7AF98; }
+  .import-hint{
+    margin-top:8px;
+    font-size:11px;
+    color:#A79F8B;
+    line-height:1.6;
+  }
+
+  .quality-card, .import-history-card{
+    margin-top:16px;
+    background:#fff9ee;
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:14px 16px;
+    box-shadow:0 2px 0 var(--line);
+  }
+  .quality-head, .import-history-head{
+    display:flex; justify-content:space-between; align-items:center;
+    font-family:'Space Mono', monospace; font-size:13px; font-weight:800;
+    letter-spacing:1px; margin-bottom:8px;
+  }
+  .quality-summary{ font-size:12px; color:var(--ink-soft); margin-bottom:8px; }
+  .quality-row, .import-history-row{
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    width:100%; border:none; background:transparent; color:var(--ink);
+    padding:7px 0; font-family:'Noto Sans TC', sans-serif; font-size:13px;
+    border-bottom:1px dashed var(--line); text-align:left; cursor:pointer;
+  }
+  .quality-row:last-child, .import-history-row:last-child{ border-bottom:none; }
+  .quality-count{ font-family:'Space Mono', monospace; font-weight:700; color:var(--warn); }
+  .quality-row.zero{ color:#AAA18C; cursor:default; }
+  .quality-row.zero .quality-count{ color:#AAA18C; }
+  .import-history-meta{ flex:1; min-width:0; }
+  .import-history-title{ font-size:13px; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .import-history-sub{ font-size:11px; color:var(--ink-soft); margin-top:2px; }
+  .undo-batch-btn{
+    border:1px solid var(--stamp); background:transparent; color:var(--stamp);
+    border-radius:7px; padding:5px 8px; font-size:11px; font-weight:700; cursor:pointer;
+  }
+  .undo-batch-btn:disabled{ border-color:#C9C2AD; color:#C9C2AD; cursor:default; }
+  .quality-result-head{
+    display:flex; justify-content:space-between; align-items:center;
+    font-family:'Space Mono', monospace; font-size:12px; color:var(--ink-soft);
+    letter-spacing:1px; margin:14px 0 10px;
+  }
+  .quality-clear-btn{ border:none; background:none; color:var(--stamp); cursor:pointer; font-size:12px; }
+  .stats-card{
+    margin-top:18px;
+    background:#fff9ee;
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:16px;
+    box-shadow: 0 2px 0 var(--line);
+  }
+  .stats-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:10px;
+  }
+  .stats-title{
+    font-family:'Space Mono', monospace;
+    font-size:14px;
+    font-weight:800;
+    letter-spacing:1px;
+    color:var(--ink);
+  }
+  .stats-month-nav{ display:flex; align-items:center; gap:2px; }
+  .stats-month-nav button{
+    background:none;
+    border:none;
+    color:var(--ink-soft);
+    font-size:17px;
+    line-height:1;
+    padding:4px 8px;
+    cursor:pointer;
+  }
+  .stats-month-nav button:disabled{ color:#DDD5C2; cursor:default; }
+  .stats-total-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    margin-bottom:14px;
+    padding-bottom:12px;
+    border-bottom:1px dashed var(--line);
+  }
+  .stats-total-amt{
+    font-family:'Space Mono', monospace;
+    font-size:28px;
+    font-weight:800;
+    color:var(--ink);
+  }
+  .stats-delta{ font-size:12px; font-weight:700; }
+  .stats-delta.up{ color:var(--stamp); }
+  .stats-delta.down{ color:var(--ok); }
+  .stats-delta.flat{ color:var(--ink-soft); }
+  .stats-empty{ font-size:13px; color:var(--ink-soft); padding:6px 0; }
+  .cat-bar-row{ margin-bottom:10px; }
+  .cat-bar-label{
+    display:flex;
+    justify-content:space-between;
+    font-size:13px;
+    color:var(--ink);
+    margin-bottom:4px;
+  }
+  .cat-bar-label .cat-bar-pct{ color:var(--ink-soft); font-size:11px; }
+  .cat-bar-track{
+    height:7px;
+    background:var(--paper-dark);
+    border-radius:4px;
+    overflow:hidden;
+  }
+  .cat-bar-fill{ height:100%; background:var(--ink); border-radius:4px; }
+  .stats-vendors{
+    margin-top:14px;
+    padding-top:12px;
+    border-top:1px dashed var(--line);
+  }
+  .stats-vendors-title{
+    font-size:11px;
+    color:var(--ink-soft);
+    letter-spacing:1px;
+    margin-bottom:8px;
+  }
+  .stats-vendor-row{
+    display:flex;
+    justify-content:space-between;
+    font-size:13px;
+    padding:4px 0;
+  }
+  .stats-vendor-row .v-name{
+    color:var(--ink);
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+    margin-right:8px;
+  }
+  .stats-vendor-row .v-amt{
+    font-family:'Space Mono', monospace;
+    color:var(--ink-soft);
+    flex-shrink:0;
+  }
+
+  .search-row{ margin:18px 0 6px; }
+  .search-row input{
+    width:100%;
+    border:1px solid var(--line);
+    border-radius:10px;
+    background:#fff9ee;
+    font-family:'Noto Sans TC', sans-serif;
+    font-size:14px;
+    color:var(--ink);
+    padding:10px 12px;
+    outline:none;
+  }
+  .search-row input::placeholder{ color:#B7AF98; }
+  .search-result-head{
+    font-family:'Space Mono', monospace;
+    font-size:12px;
+    color:var(--ink-soft);
+    letter-spacing:1px;
+    margin:14px 0 10px;
+  }
+  .search-result-date{
+    font-size:11px;
+    color:var(--ink-soft);
+    padding:8px 10px 0;
+  }
+
+  .ledger{ margin-top:28px; }
+  .day-group{ margin-bottom:22px; }
+  .day-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    font-family:'Space Mono', monospace;
+    font-size:12px;
+    color:var(--ink-soft);
+    letter-spacing:1px;
+    margin-bottom:8px;
+    padding-bottom:4px;
+    border-bottom:1px solid var(--line);
+  }
+  .day-total{ color:var(--ink); font-weight:700; }
+
+  .line-item{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    padding:9px 0;
+    border-radius:8px;
+  }
+  /* shared card frame for every "one real-world purchase" unit in the
+     ledger — a single cash/credit-card entry gets the same border/radius/
+     background as a multi-item invoice group, so a $30 coffee doesn't read
+     as a lesser-tier record than a grocery receipt with five line items. */
+  .entry-card{
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:2px 10px;
+    margin-bottom:8px;
+    background:rgba(0,0,0,0.015);
+  }
+  .entry-card .line-item{ padding:9px 0; }
+  .line-item.pending{
+    background:var(--warn-bg);
+    padding:8px 8px;
+    margin-bottom:4px;
+  }
+  .suggest-strip{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    background:#E3ECEB;
+    color:#2F5C57;
+    font-size:12px;
+    padding:7px 9px;
+    border-radius:8px;
+    margin:2px 0 8px;
+    flex-wrap:wrap;
+  }
+  .suggest-strip .txt{ flex:1; min-width:150px; line-height:1.4; }
+  .suggest-strip button{
+    border:none;
+    border-radius:6px;
+    font-size:11px;
+    font-weight:700;
+    padding:5px 9px;
+    cursor:pointer;
+    flex-shrink:0;
+  }
+  .suggest-strip .merge-btn{ background:#2F5C57; color:#fff; }
+  .suggest-strip .reject-btn{ background:transparent; color:#2F5C57; border:1px solid #2F5C57; }
+  .suggest-strip.low-confidence{ background:#EFE7DA; color:#7A6A4D; }
+  .suggest-strip.low-confidence .merge-btn{ background:#8A7550; }
+  .suggest-strip.low-confidence .reject-btn{ color:#8A7550; border-color:#8A7550; }
+  .line-item .src{
+    font-size:13px;
+    flex-shrink:0;
+  }
+  .line-item .cat-tag{
+    font-size:11px;
+    padding:3px 8px;
+    border-radius:6px;
+    background:var(--paper-dark);
+    color:var(--ink-soft);
+    flex-shrink:0;
+    white-space:nowrap;
+    cursor:pointer;
+  }
+  .cat-select{
+    font-family:'Noto Sans TC', sans-serif;
+    font-size:11px;
+    padding:3px 4px;
+    border-radius:6px;
+    border:1px solid var(--ink-soft);
+    background:var(--paper-dark);
+    color:var(--ink);
+    flex-shrink:0;
+    max-width:88px;
+  }
+  .bank-tag{
+    font-size:10.5px;
+    font-weight:700;
+    padding:3px 7px;
+    border-radius:6px;
+    background:#DCE4EC;
+    color:#3D5877;
+    flex-shrink:0;
+    white-space:nowrap;
+    cursor:pointer;
+  }
+  /* placeholder state — no bank recorded for this entry yet (CSV had no
+     bank column and the import-time input was left blank). Styled like an
+     "add" affordance (dashed outline, muted) rather than a filled tag, so
+     it doesn't read as real data, and stays clickable so it can be filled
+     in by hand at any time, not just at import time. */
+  .bank-tag.bank-tag-empty{
+    background:transparent;
+    border:1px dashed #B7AF98;
+    color:#B7AF98;
+    padding:2px 6px;
+  }
+  .bank-edit-input{
+    width:52px;
+    flex-shrink:0;
+    font-family:'Noto Sans TC', sans-serif;
+    font-size:10.5px;
+    font-weight:700;
+    color:var(--ink);
+    border:none;
+    border-bottom:1.5px solid var(--stamp);
+    background:transparent;
+    outline:none;
+    padding:0 0 1px;
+  }
+  /* every "one real-world purchase" card's title should carry the same
+     visual weight, whether that's a standalone cash/credit-card entry's
+     .note or an invoice-group's .vendor-name — both are simply "the name of
+     what this card is". Bold by default; overridden back to normal weight
+     specifically for invoice line items below, since those are sub-items of
+     an already-titled card, not a card's own title. */
+  .line-item .note{
+    flex:1;
+    font-size:14px;
+    font-weight:700;
+    color:var(--ink);
+    min-width:0;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+    cursor:pointer;
+  }
+  .invoice-items .line-item .note{ font-weight:400; }
+  .line-item .note.empty{ color:#B7AF98; }
+  .line-item .amt{
+    font-family:'Space Mono', monospace;
+    font-size:15px;
+    font-weight:700;
+    color:var(--ink);
+    flex-shrink:0;
+    cursor:pointer;
+  }
+  /* small marker shown on any line whose amount/note/bank was manually
+     touched — distinguishes "this number is what the CSV/invoice said" from
+     "a person deliberately changed this" (e.g. zeroed out because someone
+     else's share of a paid-forward invoice), without needing to open
+     anything to see that a value isn't the original imported one. */
+  .edited-badge{
+    font-size:12px;
+    color:var(--stamp);
+    flex-shrink:0;
+    cursor:default;
+  }
+  .note-edit-input{
+    flex:1;
+    min-width:0;
+    font-family:'Noto Sans TC', sans-serif;
+    font-size:14px;
+    color:var(--ink);
+    border:none;
+    border-bottom:1.5px solid var(--stamp);
+    background:transparent;
+    outline:none;
+    padding:0 0 1px;
+  }
+  .amt-edit-input{
+    width:64px;
+    flex-shrink:0;
+    font-family:'Space Mono', monospace;
+    font-size:15px;
+    font-weight:700;
+    color:var(--ink);
+    border:none;
+    border-bottom:1.5px solid var(--stamp);
+    background:transparent;
+    outline:none;
+    text-align:right;
+  }
+  .line-item .confirm-btn{
+    background:var(--warn);
+    color:#fff9ee;
+    border:none;
+    border-radius:6px;
+    font-size:11px;
+    font-weight:700;
+    padding:5px 8px;
+    cursor:pointer;
+    flex-shrink:0;
+  }
+  .line-item .del{
+    background:none;
+    border:none;
+    color:#B7AF98;
+    font-size:16px;
+    cursor:pointer;
+    padding:2px 4px;
+    flex-shrink:0;
+  }
+
+  .invoice-group{
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:8px 10px 2px;
+    margin-bottom:8px;
+    background:rgba(0,0,0,0.015);
+  }
+  .invoice-head{
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+    padding-bottom:8px;
+    margin-bottom:2px;
+    border-bottom:1px dashed var(--line);
+  }
+  .invoice-head-top{
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .invoice-head-top .src{ font-size:14px; flex-shrink:0; }
+  /* info block inside an invoice-group, showing how this invoice reconciles
+     with a credit-card charge. The row → hint pairing is wrapped in a single
+     tinted container so the whole thing reads as one bounded "reconciliation
+     info" unit, clearly separated from the actual purchased line items below
+     it — otherwise it sits at the same indent/left-right layout as a real
+     line item and a first-time viewer can mistake it for item #1 of the
+     invoice. The leading icon reuses 💳, the same icon already used for a
+     standalone credit-card entry elsewhere in the ledger, instead of a
+     separate ✅ symbol — one less symbol to learn. The amount is deliberately
+     smaller/lighter than .invoice-sub: the subtotal above is the number that
+     counts toward the total, this one is just a cross-check reference, and
+     showing them at equal visual weight makes it look like the person is
+     being charged twice. */
+  .cc-match-block{
+    background:#D9E8E5;
+    border-radius:8px;
+    padding:8px 9px 7px;
+    margin:8px 0 10px;
+  }
+  .cc-match-block.fee-block{ background:#F2E1C8; }
+  .cc-match-row{
+    display:flex;
+    align-items:center;
+    gap:7px;
+  }
+  .cc-match-row .cc-match-icon{ font-size:12px; flex-shrink:0; }
+  .cc-match-row .cc-match-note{
+    flex:1;
+    min-width:0;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+    font-size:13px;
+    color:#2F5C57;
+  }
+  .cc-match-row .cc-match-amt{
+    font-family:'Space Mono', monospace;
+    font-size:12px;
+    font-weight:600;
+    color:#2F5C57;
+    opacity:0.8;
+    flex-shrink:0;
+  }
+  .cc-match-block.fee-block .cc-match-note{ color:#8A5A1E; }
+  .cc-match-block.fee-block .cc-match-amt{ color:#8A5A1E; }
+  .cc-match-hint{
+    font-size:10.5px;
+    color:#5C8079;
+    padding:3px 0 0 19px;
+  }
+  .cc-match-block.fee-block .cc-match-hint{ color:#9C7A4A; }
+  .invoice-head .vendor-name{
+    flex:1;
+    min-width:0;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+    font-weight:700;
+    color:var(--ink);
+    font-size:14px;
+  }
+  .invoice-head-bottom{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+  }
+  .invoice-no-chip{
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    font-weight:700;
+    letter-spacing:0.3px;
+    color:var(--ink-soft);
+    background:var(--paper-dark);
+    border-radius:6px;
+    padding:3px 9px;
+    white-space:nowrap;
+  }
+  .invoice-sub{
+    font-family:'Space Mono', monospace;
+    font-size:16px;
+    font-weight:800;
+    color:var(--ink);
+  }
+  .invoice-items .line-item{
+    padding:7px 0;
+    padding-left:2px;
+  }
+
+  .empty-state{
+    text-align:center;
+    padding:50px 10px;
+    color:var(--ink-soft);
+    font-size:14px;
+  }
+
+  .footer-actions{
+    display:flex;
+    justify-content:center;
+    flex-wrap:wrap;
+    gap:18px;
+    margin-top:30px;
+    padding-top:14px;
+    border-top:1px dashed var(--line);
+  }
+  .ledger-meta-footer{
+    text-align:center;
+    font-size:10.5px;
+    color:#B7AF98;
+    margin-top:10px;
+    font-family:'Space Mono', monospace;
+    letter-spacing:0.5px;
+  }
+
+  .rules-toggle{
+    margin-top:30px;
+    padding-top:14px;
+    border-top:1px dashed var(--line);
+    text-align:center;
+    font-size:12.5px;
+    color:var(--ink-soft);
+    cursor:pointer;
+    letter-spacing:0.5px;
+  }
+  .rules-card{
+    margin-top:14px;
+    background:#fff9ee;
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:16px;
+  }
+  .rules-hint{
+    font-size:11px;
+    color:#A79F8B;
+    line-height:1.6;
+    margin-bottom:12px;
+  }
+
+  .ai-classify-textarea{
+    width:100%;
+    min-height:90px;
+    margin:8px 0;
+    border:1px solid var(--line);
+    border-radius:8px;
+    background:transparent;
+    font-family:'Space Mono', monospace;
+    font-size:12px;
+    color:var(--ink);
+    padding:8px 9px;
+    outline:none;
+    resize:vertical;
+    box-sizing:border-box;
+  }
+  .ai-classify-textarea::placeholder{ color:#B7AF98; font-family:'Noto Sans TC', sans-serif; }
+  .ai-classify-btn{
+    background:none;
+    border:1px solid var(--ink-soft);
+    color:var(--ink);
+    border-radius:7px;
+    font-size:12px;
+    font-weight:700;
+    padding:6px 12px;
+    cursor:pointer;
+    margin-right:8px;
+  }
+  .ai-classify-btn.primary{
+    background:var(--stamp);
+    color:#fff9ee;
+    border:none;
+  }
+  .footer-actions button{
+    background:none;
+    border:none;
+    color:var(--ink-soft);
+    font-size:13px;
+    font-family:'Space Mono', monospace;
+    letter-spacing:1px;
+    cursor:pointer;
+    text-decoration:underline;
+    text-underline-offset:3px;
+  }
+  .footer-file-btn{
+    color:var(--ink-soft);
+    font-size:13px;
+    font-family:'Space Mono', monospace;
+    letter-spacing:1px;
+    cursor:pointer;
+    text-decoration:underline;
+    text-underline-offset:3px;
+  }
+
+  .toast{
+    position:fixed;
+    bottom:24px;
+    left:50%;
+    transform:translateX(-50%) translateY(20px);
+    background:var(--ink);
+    color:var(--paper);
+    padding:10px 20px;
+    border-radius:999px;
+    font-size:13px;
+    opacity:0;
+    transition:all .25s ease;
+    pointer-events:none;
+    white-space:nowrap;
+    max-width:88%;
+    text-align:center;
+  }
+  .toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+  /* plain toasts stay click-through (pointer-events:none above) so they
+     never block a tap on whatever's underneath; the undo variant needs its
+     button to actually receive the click, so it opts back in. */
+  .toast.toast-interactive{ pointer-events:auto; }
+  .toast-undo-btn{
+    background:none;
+    border:none;
+    color:var(--paper);
+    font-weight:700;
+    text-decoration:underline;
+    text-underline-offset:2px;
+    font-size:13px;
+    font-family:'Noto Sans TC', sans-serif;
+    padding:0 0 0 2px;
+    cursor:pointer;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header>
+    <div class="title">CASH LEDGER<strong>記帳本</strong></div>
+    <div class="stamp">
+      <div class="label">今日</div>
+      <div class="amt" id="todayStamp">$0</div>
+    </div>
+  </header>
+
+  <div class="entry-form">
+    <div class="amount-row">
+      <span>$</span>
+      <input id="amountInput" type="number" inputmode="decimal" placeholder="0" min="0">
+    </div>
+    <div class="date-row">
+      <label for="dateInput">日期</label>
+      <input type="date" id="dateInput">
+    </div>
+    <div class="chip-row" id="chipRow"></div>
+    <div class="note-row">
+      <input id="noteInput" type="text" placeholder="備註(選填,例如：早餐、飲料)" maxlength="40">
+    </div>
+    <button class="save-btn" id="saveBtn">記一筆現金</button>
+
+    <div class="import-section">
+      <label class="import-btn">
+        🧾 匯入發票明細CSV
+        <input type="file" id="invoiceFile" accept=".csv" multiple>
+      </label>
+      <label class="import-btn">
+        💳 匯入信用卡帳單CSV
+        <input type="file" id="ccFile" accept=".csv" multiple>
+      </label>
+    </div>
+    <div class="bank-label-row">
+      <input type="text" id="ccBankInput" placeholder="銀行/卡片名稱(選填,例如:永豐;批次匯入多家銀行時建議留空,改由檔名自動判斷)" maxlength="20">
+    </div>
+    <div class="import-hint">發票明細:財政部電子發票平台「載具消費明細」下載的CSV。信用卡帳單:網路銀行下載的CSV對帳單。可一次選取多個檔案批次匯入。信用卡帳單如果檔名符合「銀行名稱信用卡帳單...」格式(例如「永豐信用卡帳單_202606.csv」),留空銀行欄位時會自動判斷;混合多家銀行的CSV一起匯入時建議留空,讓每個檔案各自判斷。匯入後會自動比對金額+日期(±6天內)去重。</div>
+  </div>
+
+  <div class="import-history-card" id="importHistoryCard" style="display:none;">
+    <div class="import-history-head"><span>最近匯入</span><span id="importHistoryCount"></span></div>
+    <div id="importHistoryList"></div>
+  </div>
+
+  <div class="quality-card" id="qualityCard">
+    <div class="quality-head"><span>資料品質</span><span id="qualityScore"></span></div>
+    <div class="quality-summary" id="qualitySummary"></div>
+    <div id="qualityRows"></div>
+  </div>
+
+  <div class="stats-card" id="statsCard">
+    <div class="stats-head">
+      <span class="stats-title" id="statsMonthLabel"></span>
+      <div class="stats-month-nav">
+        <button id="statsPrevBtn" type="button">‹</button>
+        <button id="statsNextBtn" type="button">›</button>
+      </div>
+    </div>
+    <div class="stats-total-row">
+      <span class="stats-total-amt" id="statsTotalAmt">$0</span>
+      <span class="stats-delta" id="statsDelta"></span>
+    </div>
+    <div id="statsCategoryBars"></div>
+    <div class="stats-vendors" id="statsVendors"></div>
+  </div>
+
+  <div class="search-row">
+    <input type="search" id="searchInput" placeholder="搜尋店家、備註、分類...">
+  </div>
+
+  <div class="ledger" id="ledger"></div>
+
+  <div class="rules-toggle" id="rulesToggle">🤖 AI 輔助分類 ▸</div>
+  <div class="rules-card" id="rulesCard" style="display:none;">
+    <div class="rules-hint">把還沒分類(分類是「其他」且沒手動確認過)的品項整理成清單,複製貼給AI,再把AI的回覆貼回來套用——每次都直接問AI,不會存成規則。信用卡/現金的店家、發票的品項都適用同一套流程。</div>
+    <button id="getUnclassifiedBtn" type="button" class="ai-classify-btn">取得待分類清單</button>
+    <textarea id="unclassifiedOutput" class="ai-classify-textarea" readonly placeholder="按上面的按鈕產生清單..."></textarea>
+    <button id="copyUnclassifiedBtn" type="button" class="ai-classify-btn">複製</button>
+    <div class="rules-hint" style="margin-top:12px;">貼上 AI 回覆的分類結果(「品項,分類」一行一組):</div>
+    <textarea id="aiResultInput" class="ai-classify-textarea" placeholder="星巴克,飲料&#10;全聯,日用&#10;..."></textarea>
+    <button id="applyAiResultBtn" type="button" class="ai-classify-btn primary">套用分類結果</button>
+  </div>
+
+  <div class="footer-actions">
+    <button id="exportBtn">匯出 CSV</button>
+    <button id="exportAliasBtn">匯出已學習店家</button>
+    <button id="exportBackupBtn">匯出完整備份</button>
+    <label class="footer-file-btn">
+      還原備份
+      <input type="file" id="backupFile" accept=".json" style="display:none;">
+    </label>
+    <button id="clearBtn">清空全部</button>
+  </div>
+  <div class="ledger-meta-footer" id="ledgerMetaFooter"></div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const CATEGORIES = ['餐飲','交通','日用','飲料','娛樂','醫療','運動健身','折扣調整','平台服務費','其他','服飾'];
+let selectedCategory = CATEGORIES[0];
+let entries = [];
+// guards every entry point that mutates `entries` against a real race: the
+// buttons that call addEntry/importInvoiceCSV/importCreditCardCSV/
+// importBackup/clearAll are all clickable immediately on page load, but
+// loadEntries() reads from window.storage asynchronously and, once it
+// resolves, does `entries = res ? JSON.parse(res.value) : []` — if the
+// person managed to add/import something in that window before it
+// resolved, that assignment silently wipes it out from under them. The
+// ledger's own dynamic buttons (delete, confirm, merge...) are naturally
+// safe since they don't exist until the first render() at the end of
+// init(), which only happens after loading completes.
+let dataLoaded = false;
+// vendor pairs the user has manually confirmed as "same real-world store"
+// via the merge button — e.g. cc shows "億客來生鮮超市" but the invoice is
+// issued under "育旌股份有限公司". Learned once, remembered for every
+// future reconcile() pass so the same store doesn't keep asking.
+let vendorAliases = [];
+let vendorAliasGraphCache = null;
+let importBatches = [];
+let qualityFilter = null;
+const IMPORT_BATCHES_KEY = 'import-batches-v1';
+
+const chipRow = document.getElementById('chipRow');
+const amountInput = document.getElementById('amountInput');
+const noteInput = document.getElementById('noteInput');
+const dateInput = document.getElementById('dateInput');
+const saveBtn = document.getElementById('saveBtn');
+dateInput.value = toKey(new Date());
+const ledgerEl = document.getElementById('ledger');
+const todayStamp = document.getElementById('todayStamp');
+const toast = document.getElementById('toast');
+const searchInput = document.getElementById('searchInput');
+const statsMonthLabelEl = document.getElementById('statsMonthLabel');
+const statsTotalAmtEl = document.getElementById('statsTotalAmt');
+const statsDeltaEl = document.getElementById('statsDelta');
+const statsCategoryBarsEl = document.getElementById('statsCategoryBars');
+const statsVendorsEl = document.getElementById('statsVendors');
+const statsPrevBtn = document.getElementById('statsPrevBtn');
+const statsNextBtn = document.getElementById('statsNextBtn');
+
+function renderChips(){
+  chipRow.innerHTML = '';
+  CATEGORIES.forEach(cat=>{
+    const btn = document.createElement('button');
+    btn.className = 'chip' + (cat===selectedCategory ? ' active':'');
+    btn.textContent = cat;
+    btn.onclick = ()=>{ selectedCategory = cat; renderChips(); };
+    chipRow.appendChild(btn);
+  });
+}
+
+const rulesToggleEl = document.getElementById('rulesToggle');
+const rulesCardEl = document.getElementById('rulesCard');
+let rulesExpanded = false;
+rulesToggleEl.addEventListener('click', ()=>{
+  rulesExpanded = !rulesExpanded;
+  rulesCardEl.style.display = rulesExpanded ? 'block' : 'none';
+  rulesToggleEl.textContent = '🤖 AI 輔助分類 ' + (rulesExpanded ? '▾' : '▸');
+});
+
+document.getElementById('getUnclassifiedBtn').addEventListener('click', ()=>{
+  const names = getUnclassifiedNames();
+  const outputEl = document.getElementById('unclassifiedOutput');
+  if(names.length === 0){
+    outputEl.value = '';
+    showToast('目前沒有還沒分類的品項(都分類過,或都手動確認過了)');
+    return;
+  }
+  outputEl.value = buildAiClassifyPrompt(names);
+  showToast(`已產生 ${names.length} 個待分類品項,複製貼給AI吧`);
+});
+
+document.getElementById('copyUnclassifiedBtn').addEventListener('click', async ()=>{
+  const outputEl = document.getElementById('unclassifiedOutput');
+  if(!outputEl.value){ showToast('請先按「取得待分類清單」'); return; }
+  // clipboard API needs a secure context + permission that isn't always
+  // granted inside the artifact sandbox — if it's blocked, fall back to
+  // selecting the text so the person can still copy it manually (Ctrl/Cmd+C)
+  // instead of the button silently doing nothing.
+  try{
+    await navigator.clipboard.writeText(outputEl.value);
+    showToast('已複製到剪貼簿');
+  }catch(err){
+    outputEl.focus();
+    outputEl.select();
+    showToast('自動複製被瀏覽器擋下了,已幫你選取文字,手動按 Ctrl/Cmd+C 複製');
+  }
+});
+
+document.getElementById('applyAiResultBtn').addEventListener('click', ()=>{
+  const text = document.getElementById('aiResultInput').value;
+  applyAiClassifyResult(text);
+});
+
+let toastTimeout = null;
+
+function showToast(msg){
+  toast.classList.remove('toast-interactive');
+  toast.textContent = msg;
+  toast.classList.add('show');
+  clearTimeout(toastTimeout);
+  toastTimeout = setTimeout(()=> toast.classList.remove('show'), 2200);
+}
+
+// same pill, but carries a real "復原" button — used right after a
+// destructive action (currently: single-entry delete) instead of a heavier
+// confirm-before-acting flow. The action already happened (so re-rendering
+// feels instant), and the button reverses it within the window.
+function showUndoToast(msg, undoFn){
+  toast.innerHTML = `<span>${escapeHtml(msg)}</span> <button class="toast-undo-btn" type="button">復原</button>`;
+  toast.classList.add('show', 'toast-interactive');
+  clearTimeout(toastTimeout);
+  let used = false;
+  const btn = toast.querySelector('.toast-undo-btn');
+  btn.onclick = (ev)=>{
+    ev.stopPropagation();
+    if(used) return;
+    used = true;
+    clearTimeout(toastTimeout);
+    toast.classList.remove('show', 'toast-interactive');
+    undoFn();
+  };
+  toastTimeout = setTimeout(()=>{
+    toast.classList.remove('show', 'toast-interactive');
+  }, 5000);
+}
+
+function fmt(n){
+  const neg = n < 0;
+  return (neg ? '-$' : '$') + Math.round(Math.abs(n)).toLocaleString('en-US');
+}
+
+function toKey(d){
+  const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), day=String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
+}
+
+function dateLabel(key){
+  const d = new Date(key + 'T00:00:00');
+  const today = new Date();
+  const y = new Date(today); y.setDate(y.getDate()-1);
+  if(key === toKey(today)) return '今天 · ' + (d.getMonth()+1) + '/' + d.getDate();
+  if(key === toKey(y)) return '昨天 · ' + (d.getMonth()+1) + '/' + d.getDate();
+  const weekday = ['日','一','二','三','四','五','六'][d.getDay()];
+  return (d.getMonth()+1) + '月' + d.getDate() + '日 週' + weekday;
+}
+
+// Some vendors' invoices only capture a sub-portion of a larger credit-card
+// charge — e.g. 富胖達(foodpanda)'s invoice is just the platform fee, while
+// the full order total (food + platform fee) is charged to the card under
+// the restaurant's own name. If that fee invoice hasn't been reconciled to
+// a specific card charge (the exact-discount-match case), counting it
+// separately would double-count the portion already inside the card charge.
+// Confirmed with the user: all 富胖達 invoices were paid by credit card.
+const PLATFORM_FEE_ONLY_VENDORS = ['富胖達股份有限公司'];
+
+function isPlatformFeeOnlyInvoice(e){
+  return e.source==='invoice' && !e.matchedId &&
+    PLATFORM_FEE_ONLY_VENDORS.some(v => (e.vendor||'').includes(v));
+}
+
+// counted = spending that should be included in totals (avoid double-counting merged cc+invoice pairs)
+function isCounted(e){
+  if(e.source==='creditcard' && e.matchedId) return false;
+  if(isPlatformFeeOnlyInvoice(e)) return false;
+  return true;
+}
+
+// entries are stored PER MONTH ('expense-entries-YYYY-MM') rather than one
+// giant 'expense-entries' blob. Reasoning: window.storage caps each key at
+// 5MB; at this ledger's measured real-world size (~270 bytes/entry from
+// actual CSV imports) that's a ~19,400-entry ceiling on a single key — not
+// urgent at this user's pace (~2,700 entries/year, so ~7 years out), but a
+// real wall, and every edit (even changing one note) was rewriting the
+// ENTIRE ledger's JSON on every save regardless of data size. Splitting by
+// month means (a) no realistic ceiling — a single month would need ~19,400
+// entries in ONE month to hit 5MB, versus this user's ~225/month average,
+// and (b) everyday single-entry edits (delete, category, amount, note,
+// bank, confirm/merge/reject) only rewrite the ONE month that actually
+// changed, not the whole history.
+const ENTRIES_KEY_PREFIX = 'expense-entries-'; // + 'YYYY-MM'
+const LEGACY_ENTRIES_KEY = 'expense-entries';  // pre-split single-blob format
+
+function entriesKeyForMonth(mk){ return ENTRIES_KEY_PREFIX + mk; }
+
+// every month key currently believed to exist in storage — populated from
+// window.storage.list() on load, kept in sync by saveEntries() as it writes
+// or deletes month keys. A full save (clearAll, bulk import, etc.) needs
+// this alongside whatever's in `entries`, because a month that emptied out
+// (e.g. its last entry got deleted) won't show up by scanning `entries`
+// alone, but its now-stale key still needs to be deleted from storage.
+let knownMonthKeys = new Set();
+
+async function loadEntries(){
+  entries = [];
+  knownMonthKeys = new Set();
+
+  // one-time migration: older versions of this ledger stored everything
+  // under a single 'expense-entries' key. If that key still exists, absorb
+  // it into the new per-month keys and remove the old one so this only
+  // ever runs once per ledger.
+  try{
+    const legacy = await window.storage.get(LEGACY_ENTRIES_KEY);
+    if(legacy){
+      entries = JSON.parse(legacy.value);
+      await saveEntries(); // full save: writes every month found in the legacy blob
+      try{ await window.storage.delete(LEGACY_ENTRIES_KEY); }
+      catch(e){ /* non-critical — worst case migration re-checks (and re-no-ops) next load */ }
+      return;
+    }
+  }catch(e){ /* no legacy key (or unreadable) — fall through to per-month load below */ }
+
+  try{
+    const listRes = await window.storage.list(ENTRIES_KEY_PREFIX);
+    const keys = listRes ? listRes.keys : [];
+    for(const key of keys){
+      try{
+        const res = await window.storage.get(key);
+        if(res){
+          entries.push(...JSON.parse(res.value));
+          knownMonthKeys.add(key.slice(ENTRIES_KEY_PREFIX.length));
+        }
+      }catch(e){ /* skip an unreadable month rather than losing every other month */ }
+    }
+  }catch(e){ /* window.storage.list unavailable/failed — entries stays [] */ }
+}
+
+// writes only the months in `affectedMonths` (an array/Set of 'YYYY-MM'
+// strings) when given — the normal case for a single interactive edit,
+// which only ever touches entries within one or two months. Falls back to
+// a full save (every month currently present in `entries`, plus any
+// previously-known month that's now empty and needs its stale key removed)
+// when called with no argument — used by bulk operations (import, backup
+// restore, clear, AI-classify apply) where working out the precise
+// affected set isn't worth the bookkeeping.
+async function saveEntries(affectedMonths){
+  const monthsToSave = affectedMonths
+    ? new Set(affectedMonths)
+    : new Set([...new Set(entries.map(e=>monthKeyOf(e.date))), ...knownMonthKeys]);
+  let hadError = false;
+  for(const mk of monthsToSave){
+    const monthEntries = entries.filter(e=>monthKeyOf(e.date)===mk);
+    try{
+      if(monthEntries.length === 0){
+        try{ await window.storage.delete(entriesKeyForMonth(mk)); }
+        catch(e){ /* key may never have existed in storage — not a real failure */ }
+        knownMonthKeys.delete(mk);
+      }else{
+        await window.storage.set(entriesKeyForMonth(mk), JSON.stringify(monthEntries));
+        knownMonthKeys.add(mk);
+      }
+    }catch(e){ hadError = true; }
+  }
+  if(hadError) showToast('儲存失敗,請再試一次');
+}
+
+// records when this ledger's data was first ever created, and never
+// overwrites it afterward. This exists purely so version continuity can be
+// checked empirically instead of staying an open question forever: after
+// swapping in a new build of this file, if the footer still shows the same
+// original date, window.storage genuinely carried over; if it shows today's
+// date, this is a fresh, disconnected storage bucket and old data didn't
+// survive the version change.
+let ledgerCreatedAt = null;
+
+async function loadLedgerMeta(){
+  try{
+    const res = await window.storage.get('ledger-meta');
+    if(res){
+      const meta = JSON.parse(res.value);
+      ledgerCreatedAt = meta.createdAt || null;
+    }
+  }catch(e){ /* fall through to creating it fresh below */ }
+  if(!ledgerCreatedAt){
+    ledgerCreatedAt = toKey(new Date());
+    try{ await window.storage.set('ledger-meta', JSON.stringify({createdAt: ledgerCreatedAt})); }
+    catch(e){ /* non-critical — worst case the continuity check is inconclusive this session */ }
+  }
+}
+
+async function loadVendorAliases(){
+  try{
+    const res = await window.storage.get('vendor-aliases');
+    vendorAliases = res ? JSON.parse(res.value) : [];
+    vendorAliasGraphCache = null;
+  }catch(e){ vendorAliases = []; vendorAliasGraphCache = null; }
+}
+
+async function saveVendorAliases(){
+  try{
+    await window.storage.set('vendor-aliases', JSON.stringify(vendorAliases));
+  }catch(e){ /* non-critical — worst case, this pair gets asked again next time */ }
+}
+
+function renderLedgerMetaFooter(){
+  const el = document.getElementById('ledgerMetaFooter');
+  if(!el || !ledgerCreatedAt) return;
+  el.textContent = `資料建立於 ${ledgerCreatedAt}——換版本後這個日期若沒變,代表資料有延續`;
+}
+
+function aliasKey(ccVendor, invVendor){
+  return normalizeVendorName(ccVendor) + '␟' + normalizeVendorName(invVendor);
+}
+
+function hasVendorAlias(ccVendor, invVendor){
+  return vendorAliases.includes(aliasKey(ccVendor, invVendor));
+}
+
+// learned from a manual "合併" confirmation — remembers that a specific
+// credit-card store name and a specific invoice company name are the same
+// real-world purchase, so future exact amount+date matches between this
+// pair can auto-merge without asking again.
+function learnVendorAlias(ccVendor, invVendor){
+  const key = aliasKey(ccVendor, invVendor);
+  if(!vendorAliases.includes(key)){ vendorAliases.push(key); vendorAliasGraphCache = null; }
+}
+
+// combined vendor-match check used by reconcile(): either the names
+// textually overlap, or the user has previously confirmed this exact pair
+// is the same store under a different registered company name.
+function namesMatch(ccVendor, invVendor){
+  return hasNameOverlap(ccVendor, invVendor) || hasVendorAlias(ccVendor, invVendor);
+}
+
+function escapeHtml(s){
+  return (s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function renderItemRow(e, opts){
+  opts = opts || {};
+  const pending = e.source==='creditcard' && !e.matchedId && !e.reviewed;
+  const srcIcon = opts.hideSrc ? '' : `<span class="src">${e.source==='cash' ? '💵' : (e.source==='invoice' ? '🧾' : '💳')}</span>`;
+  const bankTag = e.source==='creditcard'
+    ? `<span class="bank-tag${e.bank ? '' : ' bank-tag-empty'}" data-id="${e.id}">${e.bank ? escapeHtml(e.bank) : '+銀行'}</span>`
+    : '';
+  const noteText = e.note || e.vendor || '未備註';
+  // "empty" (muted placeholder) styling should only apply when there's truly
+  // nothing meaningful to show — not just when e.note itself is blank.
+  // Credit card entries always have note:'' (the CSV has no note column,
+  // only a store name in `vendor`), so checking e.note alone wrongly greyed
+  // out real, meaningful store names as if they were unfilled placeholders.
+  const isPlaceholder = !e.note && !e.vendor;
+  const row = document.createElement('div');
+  row.className = 'line-item' + (pending ? ' pending' : '');
+  row.innerHTML = `
+    ${srcIcon}
+    ${bankTag}
+    <span class="cat-tag" data-id="${e.id}">${escapeHtml(e.category)}</span>
+    <span class="note ${isPlaceholder ? 'empty' : ''}" data-id="${e.id}" title="${escapeHtml(noteText)}">${escapeHtml(noteText)}</span>
+    <span class="amt" data-id="${e.id}">${fmt(e.amount)}</span>
+    ${e.edited ? `<span class="edited-badge" title="原始金額 ${fmt(e.originalAmount ?? e.amount)}；原始備註 ${escapeHtml(e.originalNote || e.originalVendor || '—')}；原始銀行 ${escapeHtml(e.originalBank || '—')}">✎</span>` : ''}
+    ${pending ? `<button class="confirm-btn" data-id="${e.id}">確認</button>` : ''}
+    <button class="del" data-id="${e.id}">✕</button>
+  `;
+
+  if(e.source==='creditcard' && !e.matchedId && e.suggestedInvoiceNo){
+    const g = invoiceGroupsForSuggestion(e.suggestedInvoiceNo);
+    if(g){
+      const gap = g.sum - e.amount;
+      const wrap = document.createElement('div');
+      wrap.appendChild(row);
+      const strip = document.createElement('div');
+      strip.className = 'suggest-strip';
+      // gap>0: card was charged less than the invoice total (e.g. wallet
+      // points/coupon covered the difference). gap≈0: amount matches exactly
+      // but the vendor name didn't overlap enough to auto-merge — could be a
+      // legitimate case (invoice uses the store's registered company name,
+      // not its storefront brand) or a pure coincidence, so it needs a look.
+      const txt = gap > 0.5
+        ? `💡 疑似是「${escapeHtml(g.vendor)}」那張發票(少 ${fmt(gap)},可能是點數折抵)`
+        : `🤔 金額跟「${escapeHtml(g.vendor)}」那張發票剛好一樣,但店名對不太上,請確認是否為同一筆`;
+      strip.innerHTML = `
+        <span class="txt">${txt}</span>
+        <button class="merge-btn" data-id="${e.id}" data-no="${escapeHtml(e.suggestedInvoiceNo)}">合併</button>
+        <button class="reject-btn" data-id="${e.id}">非此筆</button>
+      `;
+      wrap.appendChild(strip);
+      return wrap;
+    }
+  }
+  return row;
+}
+
+function invoiceGroupsForSuggestion(invoiceNo){
+  const items = entries.filter(e=> e.source==='invoice' && e.invoiceNo===invoiceNo && !e.matchedId);
+  if(items.length===0) return null;
+  return { sum: items.reduce((s,i)=>s+i.amount,0), vendor: items[0].vendor || '', items };
+}
+
+function buildDayBlocks(dayEntries){
+  const invoiceBuckets = {};
+  const blocks = [];
+  dayEntries.forEach(e=>{
+    if(e.source==='invoice' && e.invoiceNo){
+      (invoiceBuckets[e.invoiceNo] = invoiceBuckets[e.invoiceNo] || []).push(e);
+    }else{
+      blocks.push({type:'single', entry:e, ts:e.ts});
+    }
+  });
+  Object.keys(invoiceBuckets).forEach(no=>{
+    const items = invoiceBuckets[no];
+    blocks.push({type:'invoice', invoiceNo:no, items, ts:Math.max(...items.map(i=>i.ts))});
+  });
+  blocks.sort((a,b)=> b.ts - a.ts);
+  return blocks;
+}
+
+// which months are expanded in the ledger — lazily initialized on first
+// render to {latest month only}, so a data set spanning several months
+// doesn't dump a huge scrolling list; user can tap a month header to
+// expand/collapse, and the choice persists across re-renders (edits, etc.)
+let expandedMonths = null;
+// same idea, but tracked separately for the 待確認 section — someone might
+// want the main ledger collapsed to one month while still browsing several
+// months of pending items, or vice versa, so these shouldn't share state.
+let expandedActionMonths = null;
+
+function monthKeyOf(dateKey){ return dateKey.slice(0,7); } // 'YYYY-MM'
+
+function monthLabel(mKey){
+  const [y, m] = mKey.split('-');
+  const curYear = String(new Date().getFullYear());
+  return (y === curYear ? '' : y + '年') + parseInt(m,10) + '月';
+}
+
+function shiftMonthKey(mk, delta){
+  const [y, m] = mk.split('-').map(Number);
+  const d = new Date(y, m - 1 + delta, 1);
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+}
+
+// which month the stats card is currently showing — lazily defaults to the
+// most recent month with data (same instinct as the ledger's own default
+// expanded month), and persists across re-renders so navigating to a
+// different month doesn't get reset by every edit elsewhere on the page.
+let statsMonthKey = null;
+
+function ensureOriginalFields(e){
+  if(!Object.prototype.hasOwnProperty.call(e,'originalAmount')) e.originalAmount = e.amount;
+  if(!Object.prototype.hasOwnProperty.call(e,'originalVendor')) e.originalVendor = e.vendor || '';
+  if(!Object.prototype.hasOwnProperty.call(e,'originalNote')) e.originalNote = e.note || '';
+  if(!Object.prototype.hasOwnProperty.call(e,'originalBank')) e.originalBank = e.bank || '';
+  return e;
+}
+
+function getVendorAliasGraph(){
+  if(vendorAliasGraphCache) return vendorAliasGraphCache;
+  const graph = {};
+  vendorAliases.forEach(pair=>{
+    const parts = String(pair).split('␟');
+    if(parts.length!==2) return;
+    const [a,b]=parts;
+    (graph[a]=graph[a]||new Set()).add(b);
+    (graph[b]=graph[b]||new Set()).add(a);
+  });
+  vendorAliasGraphCache = graph;
+  return graph;
+}
+function canonicalVendorKey(name){
+  const start = normalizeVendorName(name);
+  if(!start) return '';
+  const graph = getVendorAliasGraph();
+  const seen = new Set([start]), stack=[start];
+  while(stack.length){
+    const cur=stack.pop();
+    (graph[cur]||[]).forEach(n=>{ if(!seen.has(n)){ seen.add(n); stack.push(n); } });
+  }
+  return [...seen].sort((a,b)=>a.length-b.length || a.localeCompare(b,'zh-Hant'))[0] || start;
+}
+
+function canonicalVendorDisplay(name){
+  const key = canonicalVendorKey(name);
+  if(!key) return '';
+  const candidates = [];
+  entries.forEach(e=>{
+    const raw=(e.vendor||'').trim();
+    if(raw && canonicalVendorKey(raw)===key) candidates.push(raw);
+  });
+  if(!candidates.length) return name || key;
+  const counts={}; candidates.forEach(v=>counts[v]=(counts[v]||0)+1);
+  return Object.entries(counts).sort((a,b)=>b[1]-a[1] || a[0].length-b[0].length)[0][0];
+}
+
+function classificationHistoryKey(e){
+  const raw = classifyLookupText(e).trim();
+  if(!raw) return '';
+  return e.source==='invoice' ? 'item:'+normalizeVendorName(raw) : 'vendor:'+canonicalVendorKey(raw);
+}
+
+function historicalCategorySuggestion(e, excludeId){
+  const key = classificationHistoryKey(e);
+  if(!key) return null;
+  const counts={}; let total=0;
+  entries.forEach(x=>{
+    if(x.id===excludeId) return;
+    if(classificationHistoryKey(x)!==key) return;
+    if(!x.category || x.category==='其他') return;
+    counts[x.category]=(counts[x.category]||0)+1; total++;
+  });
+  if(total<2) return null;
+  const [category,count] = Object.entries(counts).sort((a,b)=>b[1]-a[1])[0];
+  const confidence=count/total;
+  return confidence>=0.8 ? {category,count,total,confidence} : null;
+}
+
+function applyHistoryClassificationToIds(ids){
+  let changed=0;
+  ids.forEach(id=>{
+    const e=entries.find(x=>x.id===id);
+    if(!e || e.categoryManual || e.category!=='其他') return;
+    const sug=historicalCategorySuggestion(e,e.id);
+    if(!sug) return;
+    e.category=sug.category;
+    e.categoryLearned=true;
+    e.categoryLearnedFrom=sug.total;
+    changed++;
+  });
+  return changed;
+}
+
+async function loadImportBatches(){
+  try{
+    const res=await window.storage.get(IMPORT_BATCHES_KEY);
+    importBatches=res ? JSON.parse(res.value) : [];
+    if(!Array.isArray(importBatches)) importBatches=[];
+  }catch(e){ importBatches=[]; }
+}
+async function saveImportBatches(){
+  try{ await window.storage.set(IMPORT_BATCHES_KEY, JSON.stringify(importBatches.slice(0,20))); }
+  catch(e){ showToast('匯入批次紀錄儲存失敗'); }
+}
+function snapshotLinkState(){
+  const out={};
+  entries.forEach(e=>{ out[e.id]={matchedId:e.matchedId??null, reviewed:!!e.reviewed, suggestedInvoiceNo:e.suggestedInvoiceNo??null}; });
+  return out;
+}
+function createImportBatch(type, files, addedIds, linkSnapshot, summary){
+  const changedLinks={};
+  Object.entries(linkSnapshot||{}).forEach(([id,before])=>{
+    const now=entries.find(e=>e.id===id); if(!now) return;
+    const after={matchedId:now.matchedId??null, reviewed:!!now.reviewed, suggestedInvoiceNo:now.suggestedInvoiceNo??null};
+    if(JSON.stringify(before)!==JSON.stringify(after)) changedLinks[id]=before;
+  });
+  const batch={
+    id:'b'+Date.now()+Math.random().toString(36).slice(2,7),
+    type, createdAt:new Date().toISOString(), files:files.map(f=>f.name),
+    addedIds:[...addedIds], linkSnapshot:changedLinks, summary, undone:false
+  };
+  entries.forEach(e=>{ if(batch.addedIds.includes(e.id)) e.importBatchId=batch.id; });
+  importBatches.unshift(batch);
+  importBatches=importBatches.slice(0,20);
+  return batch;
+}
+async function undoImportBatch(batchId){
+  const batch=importBatches.find(b=>b.id===batchId);
+  if(!batch || batch.undone) return;
+  const removeIds=new Set(batch.addedIds||[]);
+  const removed=entries.filter(e=>removeIds.has(e.id));
+  if(!removed.length){ batch.undone=true; await saveImportBatches(); renderImportHistory(); return; }
+  entries=entries.filter(e=>!removeIds.has(e.id));
+  Object.entries(batch.linkSnapshot||{}).forEach(([id,state])=>{
+    const e=entries.find(x=>x.id===id); if(!e) return;
+    e.matchedId=state.matchedId; e.reviewed=state.reviewed; e.suggestedInvoiceNo=state.suggestedInvoiceNo;
+  });
+  // Defensive cleanup for any relation created after the snapshot that points to removed rows.
+  entries.forEach(e=>{
+    if(removeIds.has(e.matchedId)) e.matchedId=null;
+    if(e.source==='creditcard' && e.matchedId && !entries.some(x=>x.source==='invoice' && x.invoiceNo===e.matchedId)) e.matchedId=null;
+  });
+  batch.undone=true;
+  await saveEntries(); await saveImportBatches();
+  render(); renderImportHistory();
+  showToast(`已復原這次匯入，移除 ${removed.length} 筆`);
+}
+
+function relationIntegrityIssues(){
+  return entries.filter(e=>{
+    if(!e.matchedId) return false;
+    if(e.source==='creditcard') return !entries.some(x=>x.source==='invoice' && x.invoiceNo===e.matchedId);
+    if(e.source==='invoice') return !entries.some(x=>x.source==='creditcard' && x.id===e.matchedId);
+    return false;
+  });
+}
+function qualityBuckets(){
+  return {
+    pending: entries.filter(e=>e.source==='creditcard' && !e.matchedId && !e.reviewed),
+    unclassified: entries.filter(e=>!e.categoryManual && e.category==='其他' && classifyLookupText(e).trim()),
+    missingBank: entries.filter(e=>e.source==='creditcard' && !(e.bank||'').trim()),
+    editedNoNote: entries.filter(e=>e.edited && !(e.note||'').trim()),
+    dangling: relationIntegrityIssues(),
+    unmatchedInvoices: entries.filter(e=>e.source==='invoice' && !e.matchedId && !isPlatformFeeOnlyInvoice(e))
+  };
+}
+function renderQualityCard(){
+  const buckets=qualityBuckets();
+  const defs=[
+    ['pending','信用卡待確認'],['unclassified','未分類'],['missingBank','銀行名稱缺失'],
+    ['editedNoNote','手動修改但無備註'],['dangling','配對關聯異常'],['unmatchedInvoices','未配對發票（參考）']
+  ];
+  const actionableKeys=new Set(['pending','unclassified','missingBank','editedNoNote','dangling']);
+  const total=defs.reduce((s,[k])=>s+(actionableKeys.has(k)?buckets[k].length:0),0);
+  document.getElementById('qualityScore').textContent= total===0 ? '✓' : total;
+  document.getElementById('qualitySummary').textContent= total===0 ? '目前沒有需要處理的資料品質項目' : `共有 ${total} 個待處理項目；點選下方可篩選查看`;
+  const wrap=document.getElementById('qualityRows'); wrap.innerHTML='';
+  defs.forEach(([key,label])=>{
+    const b=document.createElement('button'); b.type='button';
+    b.className='quality-row'+(buckets[key].length?'':' zero');
+    b.innerHTML=`<span>${label}</span><span class="quality-count">${buckets[key].length}</span>`;
+    if(buckets[key].length) b.onclick=()=>{ qualityFilter=key; searchQuery=''; searchInput.value=''; render(); ledgerEl.scrollIntoView({behavior:'smooth',block:'start'}); };
+    wrap.appendChild(b);
+  });
+}
+function renderImportHistory(){
+  const card=document.getElementById('importHistoryCard');
+  const list=document.getElementById('importHistoryList');
+  const recent=importBatches.slice(0,5);
+  card.style.display=recent.length?'block':'none';
+  document.getElementById('importHistoryCount').textContent=recent.length?`${recent.length} 批`:'';
+  list.innerHTML='';
+  recent.forEach(batch=>{
+    const row=document.createElement('div'); row.className='import-history-row';
+    const when=new Date(batch.createdAt); const label=`${when.getMonth()+1}/${when.getDate()} ${batch.type==='invoice'?'發票':'信用卡'}`;
+    const remaining=(batch.addedIds||[]).filter(id=>entries.some(e=>e.id===id)).length;
+    row.innerHTML=`<div class="import-history-meta"><div class="import-history-title">${escapeHtml(label)} · ${escapeHtml((batch.files||[]).join('、'))}</div><div class="import-history-sub">${escapeHtml(batch.summary||'')} ${batch.undone?'· 已復原':''}</div></div><button class="undo-batch-btn" type="button" ${batch.undone||remaining===0?'disabled':''}>復原</button>`;
+    const btn=row.querySelector('.undo-batch-btn'); if(!btn.disabled) btn.onclick=()=>undoImportBatch(batch.id);
+    list.appendChild(row);
+  });
+}
+
+function renderQualityResults(){
+  const buckets=qualityBuckets(); const matches=buckets[qualityFilter]||[];
+  ledgerEl.innerHTML='';
+  const head=document.createElement('div'); head.className='quality-result-head';
+  head.innerHTML=`<span>資料品質篩選 · ${matches.length} 筆</span><button class="quality-clear-btn" type="button">清除篩選</button>`;
+  head.querySelector('button').onclick=()=>{ qualityFilter=null; render(); };
+  ledgerEl.appendChild(head);
+  matches.slice().sort((a,b)=>b.ts-a.ts).forEach(e=>{
+    const card=document.createElement('div'); card.className='entry-card';
+    const dateLbl=document.createElement('div'); dateLbl.className='search-result-date'; dateLbl.textContent=dateLabel(e.date);
+    card.appendChild(dateLbl); card.appendChild(renderItemRow(e)); ledgerEl.appendChild(card);
+  });
+  attachLedgerHandlers();
+}
+
+function computeMonthStats(mk){
+  const monthEntries = entries.filter(e=> monthKeyOf(e.date)===mk && isCounted(e));
+  const total = monthEntries.reduce((s,e)=>s+e.amount, 0);
+  const byCategory = {};
+  monthEntries.forEach(e=>{ byCategory[e.category] = (byCategory[e.category]||0) + e.amount; });
+  const byVendor = {};
+  monthEntries.forEach(e=>{
+    const raw = (e.vendor || e.note || '').trim();
+    if(!raw) return;
+    const v = e.vendor ? canonicalVendorDisplay(raw) : raw;
+    byVendor[v] = (byVendor[v]||0) + e.amount;
+  });
+  return { total, byCategory, byVendor, count: monthEntries.length };
+}
+
+function renderStats(){
+  // navigable range: earliest month with any data, through whichever is
+  // later of (latest month with data) or (the actual current month) — so
+  // you can always page forward to "now" even before this month has any
+  // entries yet, but can't wander into empty years beyond that.
+  const monthsWithData = [...new Set(entries.map(e=>monthKeyOf(e.date)))].sort();
+  const todayMonth = monthKeyOf(toKey(new Date()));
+  const earliestMonth = monthsWithData[0] || todayMonth;
+  const latestMonth = monthsWithData.length && monthsWithData[monthsWithData.length-1] > todayMonth
+    ? monthsWithData[monthsWithData.length-1] : todayMonth;
+
+  if(statsMonthKey === null){
+    statsMonthKey = monthsWithData.length ? monthsWithData[monthsWithData.length-1] : todayMonth;
+  }
+  if(statsMonthKey < earliestMonth) statsMonthKey = earliestMonth;
+  if(statsMonthKey > latestMonth) statsMonthKey = latestMonth;
+
+  const stats = computeMonthStats(statsMonthKey);
+  const prevStats = computeMonthStats(shiftMonthKey(statsMonthKey, -1));
+
+  statsMonthLabelEl.textContent = monthLabel(statsMonthKey) + ' 統計';
+  statsTotalAmtEl.textContent = fmt(stats.total);
+
+  if(prevStats.total === 0 && stats.total === 0){
+    statsDeltaEl.textContent = '';
+    statsDeltaEl.className = 'stats-delta';
+  }else if(prevStats.total === 0){
+    statsDeltaEl.textContent = '上月無資料';
+    statsDeltaEl.className = 'stats-delta flat';
+  }else{
+    const diffPct = Math.round((stats.total - prevStats.total) / prevStats.total * 100);
+    if(diffPct === 0){
+      statsDeltaEl.textContent = '與上月持平';
+      statsDeltaEl.className = 'stats-delta flat';
+    }else{
+      statsDeltaEl.textContent = (diffPct > 0 ? '▲ 比上月多 ' : '▼ 比上月少 ') + Math.abs(diffPct) + '%';
+      statsDeltaEl.className = 'stats-delta ' + (diffPct > 0 ? 'up' : 'down');
+    }
+  }
+
+  const catEntries = Object.entries(stats.byCategory).sort((a,b)=>b[1]-a[1]);
+  if(catEntries.length === 0){
+    statsCategoryBarsEl.innerHTML = '<div class="stats-empty">這個月還沒有紀錄</div>';
+  }else{
+    const maxAmt = catEntries[0][1];
+    statsCategoryBarsEl.innerHTML = catEntries.map(([cat, amt])=>{
+      const pct = stats.total ? Math.round(amt/stats.total*100) : 0;
+      const widthPct = maxAmt ? Math.round(amt/maxAmt*100) : 0;
+      return `
+        <div class="cat-bar-row">
+          <div class="cat-bar-label"><span>${escapeHtml(cat)}</span><span>${fmt(amt)} <span class="cat-bar-pct">${pct}%</span></span></div>
+          <div class="cat-bar-track"><div class="cat-bar-fill" style="width:${widthPct}%"></div></div>
+        </div>`;
+    }).join('');
+  }
+
+  const vendorEntries = Object.entries(stats.byVendor).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  statsVendorsEl.innerHTML = vendorEntries.length === 0 ? '' :
+    '<div class="stats-vendors-title">TOP 店家</div>' +
+    vendorEntries.map(([v, amt])=>`
+      <div class="stats-vendor-row"><span class="v-name" title="${escapeHtml(v)}">${escapeHtml(v)}</span><span class="v-amt">${fmt(amt)}</span></div>`
+    ).join('');
+
+  statsPrevBtn.disabled = statsMonthKey <= earliestMonth;
+  statsNextBtn.disabled = statsMonthKey >= latestMonth;
+}
+
+statsPrevBtn.addEventListener('click', ()=>{ statsMonthKey = shiftMonthKey(statsMonthKey, -1); renderStats(); });
+statsNextBtn.addEventListener('click', ()=>{ statsMonthKey = shiftMonthKey(statsMonthKey, 1); renderStats(); });
+
+let searchQuery = '';
+
+function renderSearchResults(visible){
+  const q = searchQuery;
+  const matches = visible.filter(e=>{
+    const hay = [e.note, e.vendor, e.category, e.bank, e.vendor ? canonicalVendorDisplay(e.vendor) : ''].filter(Boolean).join(' ').toLowerCase();
+    return hay.includes(q);
+  }).sort((a,b)=> b.ts - a.ts);
+
+  ledgerEl.innerHTML = '';
+  const head = document.createElement('div');
+  head.className = 'search-result-head';
+  head.textContent = matches.length ? `找到 ${matches.length} 筆` : '沒有符合的紀錄';
+  ledgerEl.appendChild(head);
+
+  matches.forEach(e=>{
+    const card = document.createElement('div');
+    card.className = 'entry-card';
+    const dateLbl = document.createElement('div');
+    dateLbl.className = 'search-result-date';
+    dateLbl.textContent = dateLabel(e.date);
+    card.appendChild(dateLbl);
+    card.appendChild(renderItemRow(e));
+    ledgerEl.appendChild(card);
+  });
+
+  attachLedgerHandlers();
+}
+
+function render(){
+  const todayK = toKey(new Date());
+  const todayTotal = entries.filter(e=>e.date===todayK && isCounted(e)).reduce((s,e)=>s+e.amount,0);
+  todayStamp.textContent = fmt(todayTotal);
+  renderStats();
+  renderQualityCard();
+  renderImportHistory();
+
+  const visible = entries.filter(e=> !(e.source==='creditcard' && e.matchedId));
+
+  if(searchQuery){
+    renderSearchResults(visible);
+    return;
+  }
+  if(qualityFilter){
+    renderQualityResults();
+    return;
+  }
+
+  if(visible.length === 0){
+    ledgerEl.innerHTML = '<div class="empty-state">還沒有紀錄<br>記下第一筆消費,或匯入發票/帳單吧</div>';
+    return;
+  }
+
+  // pull every credit card entry that still needs a decision (no match, not
+  // yet reviewed) up to its own section at the top, instead of leaving it
+  // buried under whichever date it happens to fall on — these are the ones
+  // that need action, so they shouldn't require scrolling through history
+  const needsAction = visible.filter(e=> e.source==='creditcard' && !e.matchedId && !e.reviewed);
+  const needsActionIds = new Set(needsAction.map(e=>e.id));
+  const dateGrouped = visible.filter(e=> !needsActionIds.has(e.id));
+
+  ledgerEl.innerHTML = '';
+
+  if(needsAction.length){
+    // items with a suggested invoice still need an individual merge/reject
+    // decision, so only the plain (no-suggestion) ones are safe to batch-confirm
+    const batchable = needsAction.filter(e=> !e.suggestedInvoiceNo);
+    const section = document.createElement('div');
+    section.className = 'needs-action-section';
+    const head = document.createElement('div');
+    head.className = 'needs-action-head';
+    head.innerHTML = `
+      <span>⚠ 待確認 (${needsAction.length})</span>
+      ${batchable.length > 1 ? `<button class="batch-confirm-btn">全部確認 (${batchable.length})</button>` : ''}
+    `;
+    section.appendChild(head);
+
+    // group by month, same pattern as the main ledger below — a flat list
+    // of 100+ pending items is unusable, and this section is exactly where
+    // a big backlog piles up right after a batch CSV import.
+    const actionGroups = {};
+    const actionMonthOrder = [];
+    needsAction.forEach(e=>{
+      const mk = monthKeyOf(e.date);
+      if(!actionGroups[mk]){ actionGroups[mk] = []; actionMonthOrder.push(mk); }
+      actionGroups[mk].push(e);
+    });
+    actionMonthOrder.sort().reverse();
+
+    if(expandedActionMonths === null){
+      expandedActionMonths = new Set(actionMonthOrder.slice(0,1));
+    }
+
+    actionMonthOrder.forEach(mk=>{
+      const monthItems = actionGroups[mk];
+      const isExpanded = expandedActionMonths.has(mk);
+      const monthWithSuggestion = monthItems.filter(e=>e.suggestedInvoiceNo).length;
+
+      const monthHead = document.createElement('div');
+      monthHead.className = 'month-head action-month-head';
+      monthHead.setAttribute('data-action-month', mk);
+      monthHead.innerHTML = `
+        <span class="month-toggle">${isExpanded ? '▾' : '▸'}</span>
+        <span class="month-label">${monthLabel(mk)}</span>
+        <span class="month-total action-month-count">${monthItems.length}筆${monthWithSuggestion ? `(${monthWithSuggestion}筆需判斷)` : ''}</span>
+      `;
+      section.appendChild(monthHead);
+
+      if(isExpanded){
+        monthItems.sort((a,b)=> b.ts - a.ts).forEach(e=>{
+          section.appendChild(renderItemRow(e));
+        });
+      }
+    });
+
+    ledgerEl.appendChild(section);
+  }
+
+  if(dateGrouped.length === 0){
+    attachLedgerHandlers();
+    return;
+  }
+
+  const groups = {};
+  dateGrouped.forEach(e=>{ (groups[e.date] = groups[e.date] || []).push(e); });
+  const dateKeys = Object.keys(groups).sort().reverse();
+
+  // group day-keys into months, preserving descending order
+  const monthOrder = [];
+  const monthMap = {};
+  dateKeys.forEach(key=>{
+    const mk = monthKeyOf(key);
+    if(!monthMap[mk]){ monthMap[mk] = []; monthOrder.push(mk); }
+    monthMap[mk].push(key);
+  });
+
+  if(expandedMonths === null){
+    expandedMonths = new Set(monthOrder.slice(0,1));
+  }
+
+  monthOrder.forEach(mk=>{
+    const daysInMonth = monthMap[mk];
+    const monthEntries = daysInMonth.flatMap(k=>groups[k]);
+    const monthTotal = monthEntries.filter(isCounted).reduce((s,e)=>s+e.amount,0);
+    const isExpanded = expandedMonths.has(mk);
+
+    const monthSection = document.createElement('div');
+    monthSection.className = 'month-section';
+    const monthHead = document.createElement('div');
+    monthHead.className = 'month-head';
+    monthHead.setAttribute('data-month', mk);
+    monthHead.innerHTML = `
+      <span class="month-toggle">${isExpanded ? '▾' : '▸'}</span>
+      <span class="month-label">${monthLabel(mk)}</span>
+      <span class="month-total">${fmt(monthTotal)}</span>
+    `;
+    monthSection.appendChild(monthHead);
+
+    if(isExpanded){
+      daysInMonth.forEach(key=>{
+        const dayEntries = groups[key];
+        const dayTotal = dayEntries.filter(isCounted).reduce((s,e)=>s+e.amount,0);
+
+        const group = document.createElement('div');
+        group.className = 'day-group';
+        const head = document.createElement('div');
+        head.className = 'day-head';
+        head.innerHTML = `<span>${dateLabel(key)}</span><span class="day-total">${fmt(dayTotal)}</span>`;
+        group.appendChild(head);
+
+        const blocks = buildDayBlocks(dayEntries);
+        blocks.forEach(block=>{
+          if(block.type === 'single'){
+            const card = document.createElement('div');
+            card.className = 'entry-card';
+            card.appendChild(renderItemRow(block.entry));
+            group.appendChild(card);
+            return;
+          }
+          // invoice group: several items belonging to the same 發票號碼
+          const items = block.items;
+          const vendor = items[0].vendor || '';
+          const subtotal = items.reduce((s,i)=>s+i.amount,0);
+          const ccMatch = items[0].matchedId ? entries.find(e=>e.id===items[0].matchedId) : null;
+          const excludedAsPlatformFee = !ccMatch && isPlatformFeeOnlyInvoice(items[0]);
+          const wrap = document.createElement('div');
+          wrap.className = 'invoice-group';
+          const headRow = document.createElement('div');
+          headRow.className = 'invoice-head';
+          headRow.innerHTML = `
+            <div class="invoice-head-top">
+              <span class="src">🧾</span>
+              <span class="vendor-name" title="${escapeHtml(vendor)}">${escapeHtml(vendor)}</span>
+            </div>
+            <div class="invoice-head-bottom">
+              <span class="invoice-no-chip">${escapeHtml(block.invoiceNo)}</span>
+              <span class="invoice-sub">${fmt(subtotal)}</span>
+            </div>
+          `;
+          wrap.appendChild(headRow);
+
+          // credit-card reconciliation info renders as its own visible,
+          // clearly-bounded block (icon → bank-tag → note → amount, plus a
+          // caption) instead of being hidden behind a badge's hover tooltip
+          // or floating loose above the item list. Bank is always shown —
+          // falls back to a generic "信用卡" tag on the rare entry that has
+          // no bank label recorded, so this line never looks like it's
+          // missing information.
+          if(ccMatch){
+            const ccNote = ccMatch.vendor || ccMatch.note || '';
+            const ccBlock = document.createElement('div');
+            ccBlock.className = 'cc-match-block';
+            ccBlock.innerHTML = `
+              <div class="cc-match-row">
+                <span class="cc-match-icon">💳</span>
+                <span class="bank-tag${ccMatch.bank ? '' : ' bank-tag-empty'}" data-id="${ccMatch.id}">${ccMatch.bank ? escapeHtml(ccMatch.bank) : '+銀行'}</span>
+                <span class="cc-match-note" title="${escapeHtml(ccNote)}">${escapeHtml(ccNote)}</span>
+                <span class="cc-match-amt">${fmt(ccMatch.amount)}</span>
+              </div>
+              <div class="cc-match-hint">已比對信用卡消費,不重複計入總額</div>
+            `;
+            wrap.appendChild(ccBlock);
+          }
+          if(excludedAsPlatformFee){
+            const feeBlock = document.createElement('div');
+            feeBlock.className = 'cc-match-block fee-block';
+            feeBlock.innerHTML = `
+              <div class="cc-match-row">
+                <span class="cc-match-icon">🛵</span>
+                <span class="cc-match-note">已含於信用卡消費</span>
+              </div>
+              <div class="cc-match-hint">不計入總額,避免與信用卡重複計算</div>
+            `;
+            wrap.appendChild(feeBlock);
+          }
+
+          const itemsWrap = document.createElement('div');
+          itemsWrap.className = 'invoice-items';
+          items.sort((a,b)=> b.ts - a.ts).forEach(item=>{
+            itemsWrap.appendChild(renderItemRow(item, {hideSrc:true}));
+          });
+          wrap.appendChild(itemsWrap);
+          group.appendChild(wrap);
+        });
+
+        monthSection.appendChild(group);
+      });
+    }
+
+    ledgerEl.appendChild(monthSection);
+  });
+
+  attachLedgerHandlers();
+}
+
+function attachLedgerHandlers(){
+  ledgerEl.querySelectorAll('.bank-tag[data-id]').forEach(tag=>{
+    tag.onclick = (ev)=>{
+      ev.stopPropagation();
+      const e = entries.find(x=>x.id===tag.getAttribute('data-id'));
+      if(!e) return;
+      const oldBank = e.bank || '';
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'bank-edit-input';
+      input.value = e.bank || '';
+      input.placeholder = '銀行';
+      tag.replaceWith(input);
+      input.focus();
+      let cancelled = false;
+      input.addEventListener('keydown', ev2=>{
+        if(ev2.key === 'Enter') input.blur();
+        else if(ev2.key === 'Escape'){ cancelled = true; input.blur(); }
+      });
+      input.addEventListener('blur', async ()=>{
+        if(!cancelled){
+          const newBank = input.value.trim();
+          if(newBank !== oldBank){
+            ensureOriginalFields(e);
+            e.bank = newBank;
+            e.edited = true;
+            await saveEntries([monthKeyOf(e.date)]);
+          }
+        }
+        render();
+      });
+    };
+  });
+  ledgerEl.querySelectorAll('.del').forEach(btn=>{
+    btn.onclick = async ()=>{
+      const id = btn.getAttribute('data-id');
+      const idx = entries.findIndex(e=> e.id === id);
+      if(idx === -1) return;
+      const removed = entries[idx];
+      const relatedSnapshot = {};
+      entries.forEach(x=>{
+        if(x.id===removed.id) return;
+        const linkedToRemoved = x.matchedId===removed.id ||
+          (removed.source==='invoice' && removed.invoiceNo && x.source==='creditcard' && x.matchedId===removed.invoiceNo);
+        if(linkedToRemoved) relatedSnapshot[x.id]={matchedId:x.matchedId??null,reviewed:!!x.reviewed,suggestedInvoiceNo:x.suggestedInvoiceNo??null};
+      });
+      entries.splice(idx,1);
+      const affectedMonths=new Set([monthKeyOf(removed.date)]);
+      // Credit-card deletion unlinks all invoice items that pointed to it.
+      if(removed.source==='creditcard'){
+        entries.forEach(x=>{ if(x.source==='invoice' && x.matchedId===removed.id){ x.matchedId=null; affectedMonths.add(monthKeyOf(x.date)); } });
+      }
+      // Invoice deletion only unlinks the card when no other item from that invoice remains.
+      if(removed.source==='invoice' && removed.invoiceNo && removed.matchedId){
+        const stillHasMatchedSibling=entries.some(x=>x.source==='invoice' && x.invoiceNo===removed.invoiceNo && x.matchedId===removed.matchedId);
+        if(!stillHasMatchedSibling){
+          const cc=entries.find(x=>x.id===removed.matchedId);
+          if(cc){ cc.matchedId=null; cc.reviewed=false; cc.suggestedInvoiceNo=null; affectedMonths.add(monthKeyOf(cc.date)); }
+        }
+      }
+      await saveEntries(affectedMonths);
+      render();
+      showUndoToast('已刪除並同步解除相關配對', async ()=>{
+        entries.push(removed);
+        Object.entries(relatedSnapshot).forEach(([rid,state])=>{ const x=entries.find(e=>e.id===rid); if(x){ x.matchedId=state.matchedId; x.reviewed=state.reviewed; x.suggestedInvoiceNo=state.suggestedInvoiceNo; } });
+        await saveEntries();
+        render();
+        showToast('已復原');
+      });
+    };
+  });
+  ledgerEl.querySelectorAll('.cat-tag').forEach(tag=>{
+    tag.onclick = (ev)=>{
+      ev.stopPropagation();
+      const e = entries.find(x=>x.id===tag.getAttribute('data-id'));
+      if(!e) return;
+      // a plain <select> instead of click-to-cycle — with 11 categories now,
+      // cycling one at a time could take up to 10 taps to reach the one you
+      // want. A dropdown lets you jump straight to it.
+      const select = document.createElement('select');
+      select.className = 'cat-select';
+      CATEGORIES.forEach(cat=>{
+        const opt = document.createElement('option');
+        opt.value = cat;
+        opt.textContent = cat;
+        if(cat === e.category) opt.selected = true;
+        select.appendChild(opt);
+      });
+      tag.replaceWith(select);
+      select.focus();
+      if(typeof select.showPicker === 'function'){
+        try{ select.showPicker(); }catch(err){ /* not supported in every browser — focus() above still lets the person open it manually */ }
+      }
+      let committed = false;
+      select.addEventListener('change', async ()=>{
+        committed = true;
+        e.category = select.value;
+        e.categoryManual = true;
+        await saveEntries([monthKeyOf(e.date)]);
+        render();
+      });
+      select.addEventListener('blur', ()=>{
+        if(!committed) render();
+      });
+    };
+  });
+  ledgerEl.querySelectorAll('.confirm-btn').forEach(btn=>{
+    btn.onclick = async (ev)=>{
+      ev.stopPropagation();
+      const e = entries.find(x=>x.id===btn.getAttribute('data-id'));
+      if(!e) return;
+      e.reviewed = true;
+      await saveEntries([monthKeyOf(e.date)]); render(); showToast('已確認');
+    };
+  });
+  ledgerEl.querySelectorAll('.merge-btn').forEach(btn=>{
+    btn.onclick = async (ev)=>{
+      ev.stopPropagation();
+      const cc = entries.find(x=>x.id===btn.getAttribute('data-id'));
+      const no = btn.getAttribute('data-no');
+      if(!cc || !no) return;
+      const items = entries.filter(e=> e.source==='invoice' && e.invoiceNo===no && !e.matchedId);
+      if(items.length===0){ showToast('這張發票已經被其他項目比對走了'); return; }
+      items.forEach(item=> item.matchedId = cc.id);
+      cc.matchedId = no;
+      cc.reviewed = true;
+      cc.suggestedInvoiceNo = null;
+      // remember this vendor pairing so future exact-amount matches for the
+      // same store auto-merge instead of asking again every time
+      learnVendorAlias(cc.vendor || cc.note, items[0].vendor);
+      await saveVendorAliases();
+      // cc's date and the invoice items' dates can differ (matches are
+      // allowed up to ±6 days apart, which can cross a month boundary), so
+      // the affected set is the union of both sides, not just cc's month.
+      const affectedMonths = new Set([monthKeyOf(cc.date), ...items.map(i=>monthKeyOf(i.date))]);
+      await saveEntries(affectedMonths); render(); showToast('已合併');
+    };
+  });
+  ledgerEl.querySelectorAll('.reject-btn').forEach(btn=>{
+    btn.onclick = async (ev)=>{
+      ev.stopPropagation();
+      const cc = entries.find(x=>x.id===btn.getAttribute('data-id'));
+      if(!cc) return;
+      cc.suggestedInvoiceNo = null;
+      await saveEntries([monthKeyOf(cc.date)]); render();
+    };
+  });
+
+  const batchBtn = ledgerEl.querySelector('.batch-confirm-btn');
+  if(batchBtn){
+    batchBtn.onclick = async (ev)=>{
+      ev.stopPropagation();
+      let n = 0;
+      const affectedMonths = new Set();
+      entries.forEach(e=>{
+        if(e.source==='creditcard' && !e.matchedId && !e.reviewed && !e.suggestedInvoiceNo){
+          e.reviewed = true; n++;
+          affectedMonths.add(monthKeyOf(e.date));
+        }
+      });
+      await saveEntries(affectedMonths); render(); showToast(`已批次確認 ${n} 筆`);
+    };
+  }
+
+  ledgerEl.querySelectorAll('.month-head').forEach(head=>{
+    // this selector also catches .action-month-head (shared class purely
+    // for consistent visual styling) — skip those here, they're handled by
+    // their own listener below with a separate expand/collapse state.
+    if(head.hasAttribute('data-action-month')) return;
+    head.onclick = ()=>{
+      const mk = head.getAttribute('data-month');
+      if(expandedMonths.has(mk)) expandedMonths.delete(mk);
+      else expandedMonths.add(mk);
+      render();
+    };
+  });
+
+  ledgerEl.querySelectorAll('.action-month-head').forEach(head=>{
+    head.onclick = ()=>{
+      const mk = head.getAttribute('data-action-month');
+      if(expandedActionMonths.has(mk)) expandedActionMonths.delete(mk);
+      else expandedActionMonths.add(mk);
+      render();
+    };
+  });
+
+  // click-to-edit: amount. Swaps the static span for a number input; commits
+  // on blur/Enter, discards on Escape. Amount edits can shift totals (e.g.
+  // splitting a shared bill down to just the user's share), so a full
+  // render() follows every commit to keep day/month totals in sync.
+  ledgerEl.querySelectorAll('.amt').forEach(span=>{
+    span.onclick = (ev)=>{
+      ev.stopPropagation();
+      const e = entries.find(x=>x.id===span.getAttribute('data-id'));
+      if(!e) return;
+      const oldAmount = e.amount;
+      const input = document.createElement('input');
+      input.type = 'number';
+      input.step = 'any';
+      input.className = 'amt-edit-input';
+      input.value = e.amount;
+      span.replaceWith(input);
+      input.focus();
+      input.select();
+      let cancelled = false;
+      input.addEventListener('keydown', ev2=>{
+        if(ev2.key === 'Enter') input.blur();
+        else if(ev2.key === 'Escape'){ cancelled = true; input.blur(); }
+      });
+      input.addEventListener('blur', async ()=>{
+        if(!cancelled){
+          const val = parseFloat(input.value);
+          // 允許改成 0——用於「這張發票是代付，其中某幾項其實是別人的」
+          // 這種情境：金額歸零但保留這筆項目本身，不用整筆刪除，也不會
+          // 被算進總額（fmt(0) 顯示 $0，isCounted 邏輯不受影響，加總自然
+          // 是 0）。唯一要擋的是「不是數字」（NaN，代表輸入框裡打的不是
+          // 有效數字）。
+          if(!isNaN(val) && val !== oldAmount){
+            ensureOriginalFields(e);
+            e.amount = val;
+            e.edited = true;
+            await saveEntries([monthKeyOf(e.date)]);
+            render();
+            showUndoToast(val === 0 ? '金額已改為 $0(代付/非本人項目)' : `金額已改為 ${fmt(val)}`, async ()=>{
+              e.amount = oldAmount;
+              await saveEntries([monthKeyOf(e.date)]);
+              render();
+              showToast('已復原');
+            });
+            return;
+          }
+        }
+        render();
+      });
+    };
+  });
+
+  // click-to-edit: note. Lets the user record why an amount was adjusted
+  // (e.g. "扣掉室友那份" for a shared bill split down to their own share).
+  ledgerEl.querySelectorAll('.note').forEach(span=>{
+    span.onclick = (ev)=>{
+      ev.stopPropagation();
+      const e = entries.find(x=>x.id===span.getAttribute('data-id'));
+      if(!e) return;
+      const oldNote = e.note || '';
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'note-edit-input';
+      input.value = e.note || '';
+      input.placeholder = '新增備註';
+      span.replaceWith(input);
+      input.focus();
+      let cancelled = false;
+      input.addEventListener('keydown', ev2=>{
+        if(ev2.key === 'Enter') input.blur();
+        else if(ev2.key === 'Escape'){ cancelled = true; input.blur(); }
+      });
+      input.addEventListener('blur', async ()=>{
+        if(!cancelled){
+          const newNote = input.value.trim();
+          if(newNote !== oldNote){
+            ensureOriginalFields(e);
+            e.note = newNote;
+            e.edited = true;
+            await saveEntries([monthKeyOf(e.date)]);
+            render();
+            showUndoToast(newNote ? '備註已更新' : '備註已清空', async ()=>{
+              e.note = oldNote;
+              await saveEntries([monthKeyOf(e.date)]);
+              render();
+              showToast('已復原');
+            });
+            return;
+          }
+        }
+        render();
+      });
+    };
+  });
+}
+
+async function addEntry(){
+  if(!dataLoaded){ showToast('資料載入中,請稍等一下再試'); return; }
+  const amount = parseFloat(amountInput.value);
+  if(!amount || amount <= 0){ showToast('請輸入金額'); amountInput.focus(); return; }
+  saveBtn.disabled = true;
+  const now = new Date();
+  const todayKey = toKey(now);
+  const pickedKey = dateInput.value || todayKey;
+  // today: keep the real current time, so several cash entries logged
+  // today still sort by actual time-of-day within the day. A backfilled
+  // past date has no meaningful time-of-day to preserve, so noon is just a
+  // stable, unambiguous point within that date.
+  const entryDate = pickedKey === todayKey ? now : new Date(pickedKey + 'T12:00:00');
+  entries.push({
+    id: 'e' + now.getTime() + Math.random().toString(36).slice(2,7),
+    amount, originalAmount:amount, category: selectedCategory, note: noteInput.value.trim(), originalNote:noteInput.value.trim(), originalVendor:'', originalBank:'',
+    date: toKey(entryDate), ts: entryDate.getTime(), source:'cash', vendor:'', matchedId:null, reviewed:true, categoryManual:true
+  });
+  await saveEntries([monthKeyOf(toKey(entryDate))]);
+  amountInput.value = ''; noteInput.value = '';
+  render();
+  showToast('已記錄 ' + fmt(amount) + (pickedKey === todayKey ? '' : `(${dateLabel(pickedKey)})`));
+  saveBtn.disabled = false;
+  amountInput.focus();
+}
+
+/* ---------- CSV import & matching ---------- */
+
+function parseCSV(text){
+  const rows = []; let cur='', row=[], inQuotes=false;
+  for(let i=0;i<text.length;i++){
+    const c = text[i];
+    if(inQuotes){
+      if(c === '"'){ if(text[i+1] === '"'){ cur+='"'; i++; } else { inQuotes=false; } }
+      else { cur += c; }
+    } else {
+      if(c === '"'){ inQuotes = true; }
+      else if(c === ','){ row.push(cur); cur=''; }
+      else if(c === '\n' || c === '\r'){
+        if(c === '\r' && text[i+1] === '\n') i++;
+        row.push(cur); cur='';
+        if(row.length>1 || row[0]!=='') rows.push(row);
+        row=[];
+      } else { cur += c; }
+    }
+  }
+  if(cur.length || row.length){ row.push(cur); rows.push(row); }
+  return rows;
+}
+
+function detectColumns(headers){
+  const h = headers.map(x=> (x||'').trim());
+  const findIdx = (keywords)=> h.findIndex(col=> keywords.some(k=>col.includes(k)));
+  return {
+    dateIdx: findIdx(['日期','交易日','消費日','入帳日']),
+    amountIdx: findIdx(['金額','總金額','消費金額','台幣金額']),
+    vendorIdx: findIdx(['賣方','店家','商店','消費明細','摘要','說明','特店','名稱']),
+    bankIdx: findIdx(['銀行','卡別','發卡','卡片','卡名'])
+  };
+}
+
+function parseDateFlexible(raw){
+  if(!raw) return null;
+  const s = raw.toString().trim();
+  let m = s.match(/^(\d{2,4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})$/);
+  if(m){
+    let y = parseInt(m[1],10);
+    if(y < 1000) y += 1911;
+    return new Date(y, parseInt(m[2],10)-1, parseInt(m[3],10));
+  }
+  m = s.match(/^(\d{3})(\d{2})(\d{2})$/);
+  if(m) return new Date(parseInt(m[1],10)+1911, parseInt(m[2],10)-1, parseInt(m[3],10));
+  m = s.match(/^(\d{4})(\d{2})(\d{2})$/);
+  if(m) return new Date(parseInt(m[1],10), parseInt(m[2],10)-1, parseInt(m[3],10));
+  const d2 = new Date(s);
+  return isNaN(d2.getTime()) ? null : d2;
+}
+
+// classification is entirely AI-assisted now, not keyword-guessed at import
+// time — a substring-matching keyword list turned out to produce coincidental
+// misfires (e.g. a "米" keyword meant to catch 白米 purchases also matched
+// inside "玉米", silently mis-attributing the reasoning even when the
+// resulting category happened to look plausible). Every newly imported entry
+// starts in "其他" and gets classified through the "🤖 AI 輔助分類" panel
+// instead, which is deliberate and reviewable rather than a silent guess.
+function guessCategory(vendor){
+  return '其他';
+}
+
+function guessCategoryForItem(itemName, vendor){
+  return '其他';
+}
+
+// the text used to identify a given entry for AI-assisted classification —
+// same field priority as guessCategoryForItem already uses (invoice items
+// go by the item name first, cash/credit-card entries by vendor), so the
+// name shown to the AI is the same one matched back against on apply.
+function classifyLookupText(e){
+  return e.source==='invoice' ? (e.note || e.vendor || '') : (e.vendor || e.note || '');
+}
+
+// entries still sitting in the catch-all "其他" bucket that were never
+// manually confirmed there — these are the ones an AI-assisted pass can
+// actually help with. Manually-confirmed "其他" is a deliberate choice, not
+// a gap, so it stays excluded here (same protection applyAiClassifyResult()
+// gives it when applying results back).
+function getUnclassifiedNames(){
+  const names = new Set();
+  entries.forEach(e=>{
+    if(e.categoryManual) return;
+    if(e.category !== '其他') return;
+    const name = classifyLookupText(e).trim();
+    if(name) names.add(name);
+  });
+  return [...names].sort();
+}
+
+function buildAiClassifyPrompt(names){
+  return `請幫我把以下每個項目歸類到這幾個分類之一：${CATEGORIES.join('、')}。\n` +
+    `只能使用清單裡列出的分類名稱，不要自己發明新的分類。\n` +
+    `請用「項目名稱,分類」的格式回覆，每行一組，不要加編號、不要多餘的說明文字。\n\n` +
+    names.join('\n');
+}
+
+// runs right after an import finishes — pulls out just the item/vendor
+// names from THIS batch that are still sitting in "其他" (i.e. genuinely
+// need help, same criteria as getUnclassifiedNames), and if there are any,
+// auto-expands the AI-assist panel with the list already filled in instead
+// of making the person separately click "取得待分類清單" afterward. Returns
+// a toast-message fragment to append to the import's own toast; empty
+// string when nothing needs classifying (so the import toast stays
+// unchanged in the common case).
+function offerAiClassifyForNewEntries(newIds){
+  const names = new Set();
+  newIds.forEach(id=>{
+    const e = entries.find(x=>x.id===id);
+    if(!e || e.categoryManual || e.category !== '其他') return;
+    const name = classifyLookupText(e).trim();
+    if(name) names.add(name);
+  });
+  if(names.size === 0) return '';
+
+  if(!rulesExpanded){
+    rulesExpanded = true;
+    rulesCardEl.style.display = 'block';
+    rulesToggleEl.textContent = '🤖 AI 輔助分類 ▾';
+  }
+  document.getElementById('unclassifiedOutput').value = buildAiClassifyPrompt([...names].sort());
+  document.getElementById('aiResultInput').value = '';
+  if(typeof rulesCardEl.scrollIntoView === 'function'){
+    rulesCardEl.scrollIntoView({ behavior:'smooth', block:'start' });
+  }
+
+  return `,${names.size} 個品項待分類(已列在下方「AI輔助分類」)`;
+}
+
+// lenient parser for the pasted-back AI response — accepts comma, full-width
+// comma, colon, full-width colon, or an arrow as the separator, since
+// different AI models/people format lists slightly differently, and only
+// keeps pairs whose category exactly matches one of the known CATEGORIES
+// (silently dropping anything else, rather than risk creating a rule for a
+// category name that doesn't exist in this ledger).
+function parseAiClassifyResult(text){
+  const pairs = [];
+  text.split('\n').forEach(line=>{
+    line = line.trim();
+    if(!line) return;
+    const m = line.match(/^(.+?)[,，:：→]\s*(.+)$/);
+    if(!m) return;
+    const name = m[1].trim();
+    const cat = m[2].trim();
+    if(name && CATEGORIES.includes(cat)){
+      pairs.push({ keyword: name, category: cat });
+    }
+  });
+  return pairs;
+}
+
+async function applyAiClassifyResult(text){
+  if(!dataLoaded){ showToast('資料載入中,請稍等一下再試'); return; }
+  const pairs = parseAiClassifyResult(text);
+  if(pairs.length === 0){
+    showToast('沒有解析到有效的「品項,分類」配對,請確認格式,以及分類名稱是否是這幾個之一:' + CATEGORIES.join('、'));
+    return;
+  }
+
+  //直接套用到目前符合名稱的紀錄，不寫入任何規則清單——品項名稱重複出
+  // 現的機率很低（尤其是發票品項，幾乎每筆都不一樣），存成規則只會讓規
+  // 則清單越塞越多、卻很少真的再命中，不如每次都直接問 AI。
+  const nameToCategory = new Map(pairs.map(p=>[p.keyword, p.category]));
+  let changed = 0;
+  entries.forEach(e=>{
+    if(e.categoryManual) return;
+    const key = classifyLookupText(e).trim();
+    if(!nameToCategory.has(key)) return;
+    const newCat = nameToCategory.get(key);
+    if(newCat !== e.category){ e.category = newCat; changed++; }
+  });
+  await saveEntries();
+  render();
+
+  document.getElementById('aiResultInput').value = '';
+  document.getElementById('unclassifiedOutput').value = '';
+  if(changed === 0){
+    showToast('沒有紀錄被更新(可能品項名稱對不上,或都已手動確認過分類)');
+  }else{
+    showToast(`已套用到 ${changed} 筆紀錄`);
+  }
+}
+
+// strip common statement-line noise (bank prefixes like "連支*", "A- ", "MA-",
+// legal-entity suffixes like "股份有限公司") so we're comparing the actual
+// store name, not boilerplate that would never match between two documents
+function normalizeVendorName(s){
+  return (s||'')
+    .replace(/^(連支\*|連加\*|MA-\s?|MF-\s?|A-\s?|FP-\s?|91APP-)/,'')
+    .replace(/(股份有限公司|有限公司|企業社|商行|分公司|分店|門市部|門市|自助站|自助加油|站)/g,'')
+    .replace(/[\s\-－*_（）()０-９0-9]/g,'')
+    .trim();
+}
+
+// true if the two names share a meaningful chunk of text (2+ characters),
+// used as a sanity check before suggesting an amount/date-based match —
+// without this, any two transactions with a similar amount on a similar day
+// get suggested regardless of whether they're even the same store
+// common district/street names that show up inside lots of unrelated branch
+// addresses — without excluding these, "50嵐-竹北十興" and "全家-竹北自強"
+// would look like a name match just because both mention 竹北
+const LOCATION_STOPWORDS = ['竹北','新竹','光明','忠孝','嘉興','自強','中正','國民','莊敬','板橋','桃園','東門','西門','南門','北門','十興','光復','中山','民權'];
+
+function hasNameOverlap(a, b){
+  const na = normalizeVendorName(a), nb = normalizeVendorName(b);
+  if(na.length < 2 || nb.length < 2) return false;
+  if(na.includes(nb) || nb.includes(na)) return true;
+  for(let i=0; i<na.length-1; i++){
+    const bg = na.slice(i, i+2);
+    if(LOCATION_STOPWORDS.includes(bg)) continue;
+    if(nb.includes(bg)) return true;
+  }
+  return false;
+}
+
+function reconcile(){
+  const maxWindow = 6*24*3600*1000;
+
+  function buildInvoiceGroups(){
+    const groups = {};
+    entries.filter(e=>e.source==='invoice' && !e.matchedId && e.invoiceNo).forEach(e=>{
+      if(!groups[e.invoiceNo]) groups[e.invoiceNo] = {sum:0, ts:e.ts, vendor:e.vendor, items:[]};
+      groups[e.invoiceNo].sum += e.amount;
+      groups[e.invoiceNo].ts = Math.max(groups[e.invoiceNo].ts, e.ts);
+      groups[e.invoiceNo].items.push(e);
+    });
+    return groups;
+  }
+
+  // phase 1: exact amount match, auto-confirmed (invisible to the user —
+  // so the bar here has to be high). Requires BOTH an exact amount match
+  // AND vendor-name overlap; amount alone is too weak a signal to trust
+  // silently. Two real cases that slipped through when this only required
+  // amount+date: (a) two unrelated purchases sharing the exact same amount
+  // (a $60 drink charge auto-merged into a $60 supermarket receipt from a
+  // different store, while the correct same-store $60 charge sat unmatched
+  // because its invoice had already been "claimed" by the wrong one), and
+  // (b) a pure coincidence with no competing candidate at all (an
+  // ANTHROPIC subscription's $48 foreign-transaction fee auto-merged into a
+  // $48 McDonald's receipt purely because no other $48 charge existed
+  // nearby — nothing about the two had any real connection). Requiring
+  // vendor overlap catches both: case (a) resolves correctly because only
+  // the genuine match has overlap; case (b) no longer auto-merges at all,
+  // and falls through to phase 2 as a suggestion needing a human glance.
+  let invoiceGroups = buildInvoiceGroups();
+  let ccs = entries.filter(e=>e.source==='creditcard' && !e.matchedId);
+  const exactCandidates = [];
+  ccs.forEach(cc=>{
+    Object.keys(invoiceGroups).forEach(no=>{
+      const g = invoiceGroups[no];
+      if(Math.abs(g.sum - cc.amount) >= 0.01) return;
+      const dateDiff = Math.abs(g.ts - cc.ts);
+      if(dateDiff > maxWindow) return;
+      if(!namesMatch(cc.vendor || cc.note, g.vendor)) return;
+      exactCandidates.push({ cc, no, dateDiff });
+    });
+  });
+  exactCandidates.sort((a,b)=> a.dateDiff - b.dateDiff);
+  let matched = 0;
+  const usedCCExact = new Set(), usedInvoiceExact = new Set();
+  exactCandidates.forEach(c=>{
+    if(usedCCExact.has(c.cc.id) || usedInvoiceExact.has(c.no)) return;
+    invoiceGroups[c.no].items.forEach(item=> item.matchedId = c.cc.id);
+    c.cc.matchedId = c.no;
+    c.cc.reviewed = true;
+    c.cc.suggestedInvoiceNo = null;
+    usedCCExact.add(c.cc.id);
+    usedInvoiceExact.add(c.no);
+    matched++;
+  });
+
+  // phase 2: suggested matches — shown to the user with a merge/reject
+  // choice, never auto-applied. Covers two situations left over from phase 1:
+  //  (a) cc charged LESS than the invoice total (e.g. wallet points/coupon
+  //      covered the difference) — still requires vendor-name overlap, since
+  //      without it this produced nonsense pairings (a supermarket suggested
+  //      against a museum ticket, purely because the amount+date lined up).
+  //  (b) cc amount matches the invoice EXACTLY but didn't qualify for phase 1
+  //      because the vendor names didn't overlap — could be legitimate (the
+  //      invoice uses the store's registered company name, not its
+  //      storefront brand — e.g. a "coco" drink stand invoiced under a
+  //      generic company name) or could be pure coincidence (see the phase 1
+  //      comment above), so it's surfaced for a person to judge either way.
+  // Each invoice is only suggested to ONE cc entry (the best-fitting one),
+  // so it doesn't get dangled in front of several unrelated card lines.
+  invoiceGroups = buildInvoiceGroups();
+  ccs = entries.filter(e=>e.source==='creditcard' && !e.matchedId);
+  const candidates = [];
+  ccs.forEach(cc=>{
+    Object.keys(invoiceGroups).forEach(no=>{
+      const g = invoiceGroups[no];
+      const dateDiff = Math.abs(g.ts - cc.ts);
+      if(dateDiff > maxWindow) return;
+      const gap = g.sum - cc.amount;
+      if(Math.abs(gap) < 0.01){
+        candidates.push({ cc, no, dateDiff, gap:0 });
+        return;
+      }
+      if(gap > 0 && gap <= g.sum*0.5 && gap <= 500 && namesMatch(cc.vendor || cc.note, g.vendor)){
+        candidates.push({ cc, no, dateDiff, gap });
+      }
+    });
+  });
+  candidates.sort((a,b)=> a.dateDiff - b.dateDiff || a.gap - b.gap);
+  const usedCC = new Set(), usedInvoice = new Set();
+  candidates.forEach(c=>{
+    if(usedCC.has(c.cc.id) || usedInvoice.has(c.no)) return;
+    c.cc.suggestedInvoiceNo = c.no;
+    usedCC.add(c.cc.id);
+    usedInvoice.add(c.no);
+  });
+  ccs.forEach(cc=>{ if(!usedCC.has(cc.id)) cc.suggestedInvoiceNo = null; });
+
+  return matched;
+}
+
+// generic single-row-per-transaction importer (used for credit card statements,
+// and as a fallback for invoice CSVs that aren't the official gov item-level format)
+// defaultBank is used when the CSV itself has no bank/card column (e.g. the
+// person typed a bank name into the input field before importing)
+function genericImportRows(rows, source, defaultBank){
+  const {dateIdx, amountIdx, vendorIdx, bankIdx} = detectColumns(rows[0]);
+  if(dateIdx===-1 || amountIdx===-1) return {added:0, skipped:0, unparseable:0, skippedExamples:[], unrecognized:true};
+  let added=0, skipped=0, unparseable=0;
+  const skippedExamples = [];
+
+  // duplicate detection is multiset-based, not "does any match exist at
+  // all": count how many (date, amount, vendor) triples already exist in
+  // the ledger before this file is processed, then only treat that many
+  // *matching* incoming rows as duplicates. Two genuinely separate same-day,
+  // same-amount, same-store purchases in one CSV (e.g. two identical coffees
+  // bought hours apart) both get added — a plain "does this exact
+  // combination exist anywhere already" check would silently collapse the
+  // second real purchase into "duplicate" and lose it. This can't be a
+  // perfect fix (the source data has no unique transaction id to key off
+  // of), but it fixes the specific failure mode of legitimate repeats
+  // getting eaten, at the cost of being slightly more permissive about
+  // true re-imports beyond what already exists.
+  const existingCounts = {};
+  entries.forEach(e=>{
+    if(e.source!==source) return;
+    const key = e.date+'␟'+e.amount.toFixed(2)+'␟'+(e.vendor||'');
+    existingCounts[key] = (existingCounts[key]||0) + 1;
+  });
+
+  for(let i=1;i<rows.length;i++){
+    const r = rows[i];
+    if(!r[amountIdx]) continue;
+    const amount = parseFloat(String(r[amountIdx]).replace(/[^0-9.\-]/g,''));
+    // amount can be negative (a discount/refund line on the statement) — still
+    // counted so the total nets out correctly, same policy as invoice imports.
+    // Only skip if it's not a real number or exactly zero.
+    if(!amount || isNaN(amount)) continue;
+    const dateObj = parseDateFlexible(r[dateIdx]);
+    if(!dateObj){ unparseable++; continue; }
+    const dateKey = toKey(dateObj);
+    const vendor = vendorIdx!==-1 ? (r[vendorIdx]||'').trim() : '';
+    const bank = bankIdx!==-1 ? (r[bankIdx]||'').trim() : (defaultBank || '');
+
+    const key = dateKey+'␟'+amount.toFixed(2)+'␟'+vendor;
+    if(existingCounts[key] > 0){
+      existingCounts[key]--;
+      skipped++;
+      if(skippedExamples.length < 3) skippedExamples.push(`${dateKey.slice(5)} ${fmt(amount)}${vendor ? ' '+vendor : ''}`);
+      continue;
+    }
+
+    entries.push({
+      id: 'e'+Date.now()+Math.random().toString(36).slice(2,7)+i,
+      amount, originalAmount:amount, category: guessCategory(vendor), note:'', originalNote:'', date: dateKey, ts: dateObj.getTime(),
+      source, vendor, originalVendor:vendor, bank, originalBank:bank, matchedId:null, reviewed: source==='invoice'
+    });
+    added++;
+  }
+  return {added, skipped, unparseable, skippedExamples, unrecognized:false};
+}
+
+// official 財政部「載具消費明細」CSV: one row per line-item, so the same 發票號碼
+// repeats across several rows and each row's 消費明細_金額 is only that item's cost.
+// We group by 發票號碼 and sum, so one invoice = one ledger entry.
+function isGovInvoiceFormat(headers){
+  const need = ['發票日期','發票號碼','賣方名稱','消費明細_金額'];
+  return need.every(k=> headers.includes(k));
+}
+
+// 財政部電子發票平台匯出的「消費明細_品名」有時本身含有逗號(例如商品規格,
+// 「POLYWELL ... + 編織線 PW15-T65-0640, Apple Watch, 白色, 1條」),但欄位沒有
+// 用引號包起來,導致這一列被 naive CSV split 成比表頭還多欄。因為品名在這份官方
+// 格式裡固定是最後一欄,遇到欄位數超出表頭長度時,把從品名欄位開始到列尾的所有
+// 片段重新用逗號接回去,還原完整品名——否則會在第一個逗號處被截斷,雖然金額/
+// 發票號碼等在品名之前的欄位不受影響、不會算錯,但畫面上顯示的品名會不完整。
+function extractGovItemName(row, itemIdx, headerLen){
+  if(itemIdx === -1) return '';
+  if(itemIdx === headerLen - 1 && row.length > headerLen){
+    return row.slice(itemIdx).join(',').trim();
+  }
+  return (row[itemIdx] || '').trim();
+}
+
+function importGovInvoiceRows(rows){
+  const headers = rows[0].map(h=>(h||'').trim());
+  const idx = {
+    date: headers.indexOf('發票日期'),
+    no: headers.indexOf('發票號碼'),
+    vendor: headers.indexOf('賣方名稱'),
+    amount: headers.indexOf('消費明細_金額'),
+    item: headers.indexOf('消費明細_品名'),
+    status: headers.indexOf('發票狀態')
+  };
+  const invoiceMeta = {};   // invoiceNo -> {date, vendor}
+  const itemsByInvoice = {}; // invoiceNo -> [{name, amount}]
+  let voided = 0;
+
+  for(let i=1;i<rows.length;i++){
+    const r = rows[i];
+    if(idx.status!==-1 && (r[idx.status]||'').includes('作廢')){ voided++; continue; }
+    const no = r[idx.no];
+    if(!no) continue;
+    if(!invoiceMeta[no]) invoiceMeta[no] = { date: r[idx.date], vendor: (r[idx.vendor]||'').trim() };
+    const amt = parseFloat(String(r[idx.amount]||'0').replace(/[^0-9.\-]/g,'')) || 0;
+    // negative amount = discount/折讓 line — still counted so the invoice total nets out correctly
+    const itemName = idx.item!==-1 ? extractGovItemName(r, idx.item, headers.length) : '';
+    (itemsByInvoice[no] = itemsByInvoice[no] || []).push({ name: itemName || '未命名品項', amount: amt });
+  }
+
+  let added=0, skippedInvoices=0, unparseable=0;
+  for(const no in itemsByInvoice){
+    const meta = invoiceMeta[no];
+    const dateObj = parseDateFlexible(meta.date);
+    if(!dateObj){ unparseable++; continue; }
+    const dateKey = toKey(dateObj);
+    // dedupe at invoice level: if this invoice number was already imported before, skip the whole thing
+    const alreadyImported = entries.some(e=> e.source==='invoice' && e.invoiceNo === no);
+    if(alreadyImported){ skippedInvoices++; continue; }
+    itemsByInvoice[no].forEach((item, itemIdx)=>{
+      entries.push({
+        id: 'e'+Date.now()+Math.random().toString(36).slice(2,7)+no+itemIdx,
+        amount: item.amount, originalAmount:item.amount,
+        category: guessCategoryForItem(item.name, meta.vendor),
+        note: item.name, originalNote:item.name,
+        date: dateKey, ts: dateObj.getTime(),
+        source:'invoice', vendor: meta.vendor, originalVendor:meta.vendor, bank:'', originalBank:'', invoiceNo: no,
+        matchedId:null, reviewed:true
+      });
+      added++;
+    });
+  }
+  return {added, skipped: skippedInvoices, voided, unparseable};
+}
+
+// parses one invoice CSV file into entries (no save/reconcile/render/toast —
+// that happens once per batch, not once per file, see importInvoiceCSV below)
+async function importOneInvoiceFile(file){
+  const text = await file.text();
+  const rows = parseCSV(text).filter(r=> r.some(c=>(c||'').trim()!==''));
+  if(rows.length < 2) return {added:0, skipped:0, voided:0, unrecognized:false, empty:true};
+  const headers = rows[0].map(h=>(h||'').trim());
+  if(isGovInvoiceFormat(headers)){
+    return importGovInvoiceRows(rows);
+  }
+  return genericImportRows(rows, 'invoice');
+}
+
+// accepts a single File, a FileList, or an array of Files — lets both the
+// existing single-file call sites and the new multi-select input share one
+// code path. Files/FileLists have a numeric .length; a lone File does not.
+async function importInvoiceCSV(fileOrFiles){
+  const files = fileOrFiles ? (fileOrFiles.length !== undefined ? Array.from(fileOrFiles) : [fileOrFiles]) : [];
+  if(files.length === 0) return;
+  if(!dataLoaded){ showToast('資料載入中,請稍等一下再試'); return; }
+
+  const idsBefore = new Set(entries.map(e=>e.id));
+  const linkSnapshot = snapshotLinkState();
+  const totals = {added:0, skipped:0, voided:0, unparseable:0};
+  const emptyFiles = [];
+  const unrecognizedFiles = [];
+  const skippedExamples = [];
+  for(const file of files){
+    const r = await importOneInvoiceFile(file);
+    if(r.unrecognized){ unrecognizedFiles.push(file.name); continue; }
+    if(r.empty){ emptyFiles.push(file.name); continue; }
+    totals.added += r.added || 0;
+    totals.skipped += r.skipped || 0;
+    totals.voided += r.voided || 0;
+    totals.unparseable += r.unparseable || 0;
+    if(r.skippedExamples) skippedExamples.push(...r.skippedExamples);
+  }
+
+  await saveEntries();
+  const matched = reconcile();
+  await saveEntries();
+  render();
+
+  const newIds = entries.filter(e=>!idsBefore.has(e.id)).map(e=>e.id);
+  const historyClassified = applyHistoryClassificationToIds(newIds);
+  if(historyClassified) await saveEntries();
+
+  const parts = [`匯入 ${totals.added} 筆品項`];
+  if(files.length > 1) parts.push(`(共 ${files.length} 個檔案)`);
+  if(totals.skipped) parts.push(`,略過重複發票 ${totals.skipped} 張` + (skippedExamples.length ? `(例:${skippedExamples.slice(0,3).join('、')})` : ''));
+  if(totals.voided) parts.push(`,略過作廢 ${totals.voided} 筆`);
+  if(totals.unparseable) parts.push(`,${totals.unparseable} 筆日期格式看不懂被跳過`);
+  if(matched) parts.push(`,自動比對信用卡 ${matched} 張`);
+  if(unrecognizedFiles.length) parts.push(`;無法辨識欄位:${unrecognizedFiles.join('、')}`);
+  if(emptyFiles.length) parts.push(`;內容是空的:${emptyFiles.join('、')}`);
+  if(historyClassified) parts.push(`,依歷史自動分類 ${historyClassified} 筆`);
+  parts.push(offerAiClassifyForNewEntries(newIds));
+  if(newIds.length){ createImportBatch('invoice', files, newIds, linkSnapshot, parts.join('')); await saveImportBatches(); await saveEntries(); render(); }
+  showToast(parts.join(''));
+}
+
+// this user's credit-card CSVs are consistently converted from bank
+// e-statement PDFs and named "{銀行}信用卡帳單_YYYYMM.csv" (e.g.
+// "永豐信用卡帳單_202606.csv") — the bank name the CSV itself lacks a column
+// for is sitting right there in the filename. Used only when the person
+// left the bank input blank and the CSV has no bank column of its own.
+function guessBankFromFilename(filename){
+  if(!filename) return '';
+  const m = filename.match(/^([\u4e00-\u9fa5A-Za-z]{2,6}?)(信用卡|卡)/);
+  return m ? m[1] : '';
+}
+
+// parses one credit-card CSV file (no save/reconcile/render/toast — batched
+// once per import call, see importCreditCardCSV below). Bank resolution
+// order per file: explicit input box > this file's own filename > blank.
+async function importOneCreditCardFile(file, bankLabel){
+  const text = await file.text();
+  const rows = parseCSV(text).filter(r=> r.some(c=>(c||'').trim()!==''));
+  if(rows.length < 2) return {added:0, skipped:0, unrecognized:false, empty:true, bank:''};
+  const guessedBank = bankLabel ? '' : guessBankFromFilename(file.name);
+  const effectiveBank = bankLabel || guessedBank;
+  const result = genericImportRows(rows, 'creditcard', effectiveBank);
+  return Object.assign(result, { bank: effectiveBank, guessed: !!guessedBank });
+}
+
+// accepts a single File, a FileList, or an array of Files, same as
+// importInvoiceCSV — lets one call cover both single- and multi-select.
+async function importCreditCardCSV(fileOrFiles, bankLabel){
+  const files = fileOrFiles ? (fileOrFiles.length !== undefined ? Array.from(fileOrFiles) : [fileOrFiles]) : [];
+  if(files.length === 0) return;
+  if(!dataLoaded){ showToast('資料載入中,請稍等一下再試'); return; }
+
+  const idsBefore = new Set(entries.map(e=>e.id));
+  const linkSnapshot = snapshotLinkState();
+  const totals = {added:0, skipped:0, unparseable:0};
+  const emptyFiles = [];
+  const unrecognizedFiles = [];
+  const skippedExamples = [];
+  const banksUsed = new Set();
+  let anyGuessed = false;
+  for(const file of files){
+    const r = await importOneCreditCardFile(file, bankLabel);
+    if(r.unrecognized){ unrecognizedFiles.push(file.name); continue; }
+    if(r.empty){ emptyFiles.push(file.name); continue; }
+    totals.added += r.added || 0;
+    totals.skipped += r.skipped || 0;
+    totals.unparseable += r.unparseable || 0;
+    if(r.skippedExamples) skippedExamples.push(...r.skippedExamples);
+    if(r.bank) banksUsed.add(r.bank);
+    if(r.guessed) anyGuessed = true;
+  }
+
+  await saveEntries();
+  const matched = reconcile();
+  await saveEntries();
+  render();
+
+  const newIds = entries.filter(e=>!idsBefore.has(e.id)).map(e=>e.id);
+  const historyClassified = applyHistoryClassificationToIds(newIds);
+  if(historyClassified) await saveEntries();
+
+  const bankSummary = banksUsed.size ? [...banksUsed].join('、') : '';
+  const parts = [`匯入 ${totals.added} 筆${bankSummary ? bankSummary+'信用卡' : '信用卡'}消費`];
+  if(files.length > 1) parts.push(`(共 ${files.length} 個檔案)`);
+  if(anyGuessed) parts.push(`(部分銀行從檔名判斷,如有誤可點標籤修改)`);
+  if(totals.skipped) parts.push(`,略過重複 ${totals.skipped} 筆` + (skippedExamples.length ? `(例:${skippedExamples.slice(0,3).join('、')})` : ''));
+  if(totals.unparseable) parts.push(`,${totals.unparseable} 筆日期格式看不懂被跳過`);
+  if(matched) parts.push(`,自動比對發票 ${matched} 筆`);
+  if(unrecognizedFiles.length) parts.push(`;無法辨識欄位:${unrecognizedFiles.join('、')}`);
+  if(emptyFiles.length) parts.push(`;內容是空的:${emptyFiles.join('、')}`);
+  if(historyClassified) parts.push(`,依歷史自動分類 ${historyClassified} 筆`);
+  parts.push(offerAiClassifyForNewEntries(newIds));
+  if(newIds.length){ createImportBatch('creditcard', files, newIds, linkSnapshot, parts.join('')); await saveImportBatches(); await saveEntries(); render(); }
+  showToast(parts.join(''));
+}
+
+document.getElementById('invoiceFile').addEventListener('change', (e)=>{
+  importInvoiceCSV(e.target.files); e.target.value='';
+});
+document.getElementById('ccFile').addEventListener('change', (e)=>{
+  const bankLabel = document.getElementById('ccBankInput').value.trim();
+  importCreditCardCSV(e.target.files, bankLabel);
+  e.target.value='';
+});
+
+/* ---------- export / clear ---------- */
+
+function exportCSV(){
+  if(entries.length === 0){ showToast('沒有資料可匯出'); return; }
+  const rows = [['日期','來源','銀行/卡片','分類','金額','店家/備註','發票號碼','狀態']];
+  entries.slice().sort((a,b)=>a.ts-b.ts).forEach(e=>{
+    const srcLabel = {cash:'現金', invoice:'發票', creditcard:'信用卡'}[e.source];
+    const status = (e.source==='creditcard' && e.matchedId) ? '已與發票合併(不重複計入)' :
+                    (e.source==='invoice' && e.matchedId) ? '已與信用卡合併' :
+                    isPlatformFeeOnlyInvoice(e) ? '已含於信用卡消費(不重複計入)' : '計入總額';
+    rows.push([e.date, srcLabel, e.bank||'', e.category, e.amount, (e.note||e.vendor||'').replace(/,/g,'、'), e.invoiceNo||'', status]);
+  });
+  const csv = rows.map(r=>r.join(',')).join('\n');
+  const blob = new Blob(['\uFEFF' + csv], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = '記帳紀錄_' + toKey(new Date()) + '.csv';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function exportVendorAliases(){
+  if(vendorAliases.length === 0){ showToast('目前還沒有學到任何店家對應'); return; }
+  const rows = [['信用卡店名(標準化後)','發票公司名稱(標準化後)']];
+  vendorAliases.forEach(key=>{
+    const [ccPart, invPart] = key.split('␟');
+    rows.push([ccPart, invPart]);
+  });
+  const csv = rows.map(r=>r.join(',')).join('\n');
+  const blob = new Blob(['\uFEFF' + csv], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = '已學習店家對應_' + toKey(new Date()) + '.csv';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast(`已匯出 ${vendorAliases.length} 組店家對應`);
+}
+
+// full backup: every raw entry + the learned vendor-alias list, as JSON —
+// this is the actual data model (window.storage's 'expense-entries' /
+// 'vendor-aliases' keys), not a display-formatted export like exportCSV.
+// Meant as a downloadable file the user can hold onto themselves, and as
+// the source for importBackup() below to restore from.
+function exportBackup(){
+  if(entries.length === 0 && vendorAliases.length === 0){ showToast('沒有資料可備份'); return; }
+  const backup = {
+    format: 'expense-ledger-backup',
+    version: 2,
+    exportedAt: new Date().toISOString(),
+    entries,
+    vendorAliases,
+    importBatches
+  };
+  const blob = new Blob([JSON.stringify(backup, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = '記帳本備份_' + toKey(new Date()) + '.json';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast(`已匯出備份:${entries.length} 筆紀錄、${vendorAliases.length} 組店家對應`);
+}
+
+// restore merges rather than replaces: any entry whose id already exists in
+// the current ledger is skipped (already have it), anything new gets added.
+// This is deliberately non-destructive — restoring an older backup on top
+// of a ledger that already has newer data won't wipe the newer data, so it
+// doesn't need a "are you sure" gate the way 清空全部 does.
+async function importBackup(file){
+  if(!file) return;
+  if(!dataLoaded){ showToast('資料載入中,請稍等一下再試'); return; }
+  let data;
+  try{
+    data = JSON.parse(await file.text());
+  }catch(err){ showToast('備份檔案格式錯誤,無法讀取'); return; }
+  if(!data || !Array.isArray(data.entries)){ showToast('備份檔案格式不符,找不到記帳資料'); return; }
+
+  const existingIds = new Set(entries.map(e=>e.id));
+  let added = 0;
+  data.entries.forEach(e=>{
+    if(e && e.id && !existingIds.has(e.id)){
+      ensureOriginalFields(e);
+      entries.push(e);
+      existingIds.add(e.id);
+      added++;
+    }
+  });
+
+  let aliasAdded = 0;
+  if(Array.isArray(data.vendorAliases)){
+    data.vendorAliases.forEach(key=>{
+      if(typeof key === 'string' && !vendorAliases.includes(key)){
+        vendorAliases.push(key);
+        vendorAliasGraphCache = null;
+        aliasAdded++;
+      }
+    });
+  }
+
+  if(Array.isArray(data.importBatches)){
+    const known=new Set(importBatches.map(b=>b.id));
+    data.importBatches.forEach(b=>{ if(b && b.id && !known.has(b.id)){ importBatches.push(b); known.add(b.id); } });
+    importBatches.sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
+    importBatches=importBatches.slice(0,20);
+    await saveImportBatches();
+  }
+
+  await saveEntries();
+  await saveVendorAliases();
+  reconcile();
+  await saveEntries();
+  render();
+
+  if(added === 0 && aliasAdded === 0){
+    showToast('備份裡的資料都已經在目前的帳本裡了,沒有新增');
+  }else{
+    showToast(`已還原備份:新增 ${added} 筆紀錄` + (aliasAdded ? `、${aliasAdded} 組店家對應` : ''));
+  }
+}
+
+let clearArmed = false;
+let clearArmTimeout = null;
+const clearBtnEl = document.getElementById('clearBtn');
+
+async function clearAll(){
+  if(!dataLoaded){ showToast('資料載入中,請稍等一下再試'); return; }
+  if(!clearArmed){
+    clearArmed = true;
+    clearBtnEl.textContent = '再按一次清空全部';
+    showToast('確定要清空嗎?再按一次「清空全部」執行,3秒內有效');
+    clearTimeout(clearArmTimeout);
+    clearArmTimeout = setTimeout(()=>{
+      clearArmed = false;
+      clearBtnEl.textContent = '清空全部';
+    }, 3000);
+    return;
+  }
+  clearTimeout(clearArmTimeout);
+  clearArmed = false;
+  clearBtnEl.textContent = '清空全部';
+  entries = []; importBatches = [];
+  await saveEntries(); await saveImportBatches(); render(); showToast('已清空');
+}
+
+saveBtn.addEventListener('click', addEntry);
+amountInput.addEventListener('keydown', (e)=>{ if(e.key==='Enter') addEntry(); });
+searchInput.addEventListener('input', ()=>{
+  searchQuery = searchInput.value.trim().toLowerCase();
+  render();
+});
+document.getElementById('exportBtn').addEventListener('click', exportCSV);
+document.getElementById('exportAliasBtn').addEventListener('click', exportVendorAliases);
+document.getElementById('exportBackupBtn').addEventListener('click', exportBackup);
+document.getElementById('backupFile').addEventListener('change', (e)=>{
+  const f = e.target.files[0];
+  importBackup(f);
+  e.target.value = '';
+});
+document.getElementById('clearBtn').addEventListener('click', clearAll);
+
+(async function init(){
+  renderChips();
+  await loadEntries();
+  const needsOriginalMigration = entries.some(e=>
+    !Object.prototype.hasOwnProperty.call(e,'originalAmount') ||
+    !Object.prototype.hasOwnProperty.call(e,'originalVendor') ||
+    !Object.prototype.hasOwnProperty.call(e,'originalNote') ||
+    !Object.prototype.hasOwnProperty.call(e,'originalBank')
+  );
+  entries.forEach(ensureOriginalFields);
+  if(needsOriginalMigration) await saveEntries();
+  await loadVendorAliases();
+  await loadImportBatches();
+  await loadLedgerMeta();
+  dataLoaded = true;
+  render();
+  renderLedgerMetaFooter();
+})();
+</script>
+</body>
+</html>
