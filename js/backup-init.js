@@ -213,8 +213,8 @@ function exportVendorAliases() {
 }
 
 // full backup: every raw entry + the learned vendor-alias list, as JSON —
-// this is the actual data model (window.storage's 'expense-entries' /
-// 'vendor-aliases' keys), not a display-formatted export like exportCSV.
+// this is the ledger's actual storage model, not a display-formatted export
+// like exportCSV.
 // Meant as a downloadable file the user can hold onto themselves, and as
 // the source for importBackup() below to restore from.
 function exportBackup() {
@@ -376,12 +376,19 @@ document.getElementById("backupFile").addEventListener("change", (e) => {
   e.target.value = "";
 });
 document.getElementById("clearBtn").addEventListener("click", clearAll);
-
 (async function init() {
   renderChips();
   initializeUI();
   const modeBanner = document.getElementById("storageModeBanner");
-  if (storageMode === "file") modeBanner.style.display = "block";
+  if (storageMode === "file") {
+    modeBanner.style.display = "block";
+    document.body.classList.remove("auth-locked");
+  } else {
+    if (!expenseLedgerSupabase) return;
+    const { data, error } = await expenseLedgerSupabase.auth.getUser();
+    if (error || !data.user) return;
+    document.body.classList.remove("auth-locked");
+  }
   try {
     await loadEntries();
     const needsOriginalMigration = entries.some((e) =>
@@ -394,17 +401,17 @@ document.getElementById("clearBtn").addEventListener("click", clearAll);
     if (needsOriginalMigration) await saveEntries();
     await loadVendorAliases();
     await loadImportBatches();
-    await loadLedgerMeta();
   } catch (error) {
+    document.body.classList.remove("data-loading");
     modeBanner.style.display = "block";
     modeBanner.textContent = storageMode === "file"
       ? "本機測試資料載入失敗，已停止所有資料操作。請確認 deno task dev 仍在執行後重新整理。"
-      : "瀏覽器儲存空間無法使用或資料損壞，已停止所有資料操作。請先保留現有備份並檢查瀏覽器設定。";
+      : "雲端帳本載入失敗，已停止所有資料操作。請確認網路與 Supabase 狀態後重新整理。";
     showToast("資料載入失敗，未進行任何修改");
     console.error(error);
     return;
   }
   dataLoaded = true;
   render();
-  renderLedgerMetaFooter();
+  document.body.classList.remove("data-loading");
 })();

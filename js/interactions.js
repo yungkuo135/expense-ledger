@@ -371,6 +371,7 @@ async function addEntry() {
     return;
   }
   saveBtn.disabled = true;
+  saveBtn.textContent = "儲存中…";
   const now = new Date();
   const todayKey = toKey(now);
   const pickedKey = dateInput.value || todayKey;
@@ -404,6 +405,8 @@ async function addEntry() {
     await saveEntries([monthKeyOf(toKey(entryDate))]);
     amountInput.value = "";
     noteInput.value = "";
+    if (expandedMonths) expandedMonths.add(monthKeyOf(newEntry.date));
+    closeCashEntry();
     render();
     showToast(
       "已記錄 " + fmt(amount) +
@@ -415,5 +418,6 @@ async function addEntry() {
     render();
   } finally {
     saveBtn.disabled = false;
+    saveBtn.textContent = "記一筆現金";
   }
 }

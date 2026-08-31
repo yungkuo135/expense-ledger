@@ -11,10 +11,48 @@
     >
     <link rel="stylesheet" href="css/styles.css">
   </head>
-  <body>
+  <body class="auth-locked auth-checking data-loading">
     <div class="app">
       <div class="storage-mode-banner" id="storageModeBanner">
         本機測試模式 · 資料自動儲存在 private/state，不會修改一般模式帳本
+      </div>
+      <details class="cloud-panel" id="cloudPanel">
+        <summary>
+          <span class="cloud-status-dot" aria-hidden="true"></span>
+          <span id="cloudPanelLabel">帳號</span>
+          <span class="cloud-summary-chevron" aria-hidden="true"></span>
+        </summary>
+        <div class="cloud-panel-body">
+          <p id="cloudStatus">正在檢查 Supabase 狀態…</p>
+          <form id="cloudAuthForm">
+            <input
+              id="cloudEmail"
+              type="email"
+              autocomplete="email"
+              placeholder="Email"
+              required
+            >
+            <input
+              id="cloudPassword"
+              type="password"
+              autocomplete="current-password"
+              placeholder="密碼（至少 6 個字元）"
+              minlength="6"
+              required
+            >
+            <div class="cloud-actions">
+              <button type="submit">登入</button>
+            </div>
+          </form>
+          <div class="cloud-actions">
+            <button type="button" id="cloudSignOutBtn" hidden>登出</button>
+          </div>
+          <small>登入後才會載入雲端帳本資料。</small>
+        </div>
+      </details>
+      <div class="app-loading" id="appLoading" role="status" aria-live="polite">
+        <span class="loading-spinner" aria-hidden="true"></span>
+        <strong id="appLoadingLabel">正在開啟帳本</strong>
       </div>
       <header>
         <div class="title">CASH LEDGER<strong>記帳本</strong></div>
@@ -23,33 +61,14 @@
             class="header-add-btn"
             id="addActionBtn"
             type="button"
-            aria-haspopup="dialog"
-            aria-expanded="false"
           >
-            ＋<span>新增</span>
+            ＋<span>記一筆</span>
           </button>
-          <div class="stamp">
-            <div class="label">今日</div>
-            <div class="amt" id="todayStamp">$0</div>
-          </div>
         </div>
       </header>
 
       <main>
         <section class="app-view active" id="view-home" data-view="home">
-          <div class="home-summary-card">
-            <div class="section-kicker">本月概覽</div>
-            <div class="home-summary-total" id="homeMonthTotal">$0</div>
-            <div class="home-summary-grid">
-              <div>
-                <span>計入項目</span><strong id="homeMonthCount">0 筆</strong>
-              </div>
-              <button type="button" id="homePendingBtn">
-                <span>待處理</span><strong id="homePendingCount">0 項</strong>
-              </button>
-            </div>
-          </div>
-
           <div class="entry-form" id="cashEntryPanel" hidden>
             <div class="panel-title-row">
               <strong>記一筆現金</strong><button
@@ -87,32 +106,85 @@
             <button class="save-btn" id="saveBtn">記一筆現金</button>
           </div>
 
-          <div
-            class="import-history-card"
-            id="importHistoryCard"
-            style="display: none"
-          >
-            <div class="import-history-head">
-              <span>最近匯入</span><span id="importHistoryCount"></span>
-            </div>
-            <div id="importHistoryList"></div>
+          <div class="home-tool-row">
+            <details class="compact-tool" id="filterTools">
+              <summary id="filterToolsSummary">搜尋與篩選</summary>
+              <div class="filter-card">
+                <div class="search-row">
+                  <input
+                    type="search"
+                    id="searchInput"
+                    placeholder="搜尋店家、備註、分類..."
+                  >
+                </div>
+                <div class="filter-grid">
+                  <select id="sourceFilter" aria-label="資料來源">
+                    <option value="all">全部來源</option>
+                    <option value="cash">現金</option>
+                    <option value="invoice">發票</option>
+                    <option value="creditcard">未合併信用卡</option>
+                  </select>
+                  <select id="categoryFilter" aria-label="分類">
+                    <option value="all">全部分類</option>
+                  </select>
+                  <input type="month" id="monthFilter" aria-label="月份">
+                  <select id="reviewFilter" aria-label="處理狀態">
+                    <option value="all">全部狀態</option>
+                    <option value="pending">信用卡待確認</option>
+                    <option value="unclassified">尚未分類</option>
+                    <option value="reviewedOther">已確認為其他</option>
+                    <option value="matched">已配對</option>
+                  </select>
+                </div>
+                <div class="filter-summary" id="filterSummary"></div>
+              </div>
+            </details>
+
+            <details class="compact-tool" id="dataTools">
+              <summary>資料工具</summary>
+              <div class="data-tool-body">
+                <div class="data-import-grid">
+                  <button type="button" id="addInvoiceChoice">
+                    匯入發票 CSV
+                  </button>
+                  <div class="data-cc-import">
+                    <input
+                      type="text"
+                      id="ccBankInput"
+                      placeholder="銀行／卡片名稱（選填）"
+                      maxlength="20"
+                    >
+                    <button type="button" id="addCcChoice">
+                      匯入信用卡帳單
+                    </button>
+                  </div>
+                </div>
+                <div
+                  class="import-history-card"
+                  id="importHistoryCard"
+                  style="display: none"
+                >
+                  <div class="import-history-head">
+                    <span>最近匯入</span><span id="importHistoryCount"></span>
+                  </div>
+                  <div id="importHistoryList"></div>
+                </div>
+                <div class="footer-actions">
+                  <button id="exportBtn">匯出 CSV</button>
+                  <button id="exportAliasBtn">匯出已學習店家</button>
+                  <button id="exportBackupBtn">匯出完整備份</button>
+                  <label class="footer-file-btn">還原備份<input
+                      type="file"
+                      id="backupFile"
+                      accept=".json"
+                      hidden
+                    ></label><button id="clearBtn">清空全部</button>
+                </div>
+              </div>
+            </details>
           </div>
 
-          <details class="secondary-tools">
-            <summary>資料工具</summary>
-            <div class="footer-actions">
-              <button id="exportBtn">匯出 CSV</button>
-              <button id="exportAliasBtn">匯出已學習店家</button>
-              <button id="exportBackupBtn">匯出完整備份</button>
-              <label class="footer-file-btn">還原備份<input
-                  type="file"
-                  id="backupFile"
-                  accept=".json"
-                  hidden
-                ></label><button id="clearBtn">清空全部</button>
-            </div>
-            <div class="ledger-meta-footer" id="ledgerMetaFooter"></div>
-          </details>
+          <div class="ledger" id="ledger"></div>
         </section>
 
         <section class="app-view" id="view-inbox" data-view="inbox" hidden>
@@ -190,44 +262,6 @@
           <div class="ledger workbox-ledger" id="workboxLedger"></div>
         </section>
 
-        <section class="app-view" id="view-ledger" data-view="ledger" hidden>
-          <div class="view-heading">
-            <div>
-              <span class="section-kicker">TRANSACTIONS</span><h1>明細</h1>
-            </div>
-          </div>
-          <div class="filter-card">
-            <div class="search-row">
-              <input
-                type="search"
-                id="searchInput"
-                placeholder="搜尋店家、備註、分類..."
-              >
-            </div>
-            <div class="filter-grid">
-              <select id="sourceFilter" aria-label="資料來源">
-                <option value="all">全部來源</option>
-                <option value="cash">現金</option>
-                <option value="invoice">發票</option>
-                <option value="creditcard">未合併信用卡</option>
-              </select>
-              <select id="categoryFilter" aria-label="分類">
-                <option value="all">全部分類</option>
-              </select>
-              <input type="month" id="monthFilter" aria-label="月份">
-              <select id="reviewFilter" aria-label="處理狀態">
-                <option value="all">全部狀態</option>
-                <option value="pending">信用卡待確認</option>
-                <option value="unclassified">尚未分類</option>
-                <option value="reviewedOther">已確認為其他</option>
-                <option value="matched">已配對</option>
-              </select>
-            </div>
-            <div class="filter-summary" id="filterSummary"></div>
-          </div>
-          <div class="ledger" id="ledger"></div>
-        </section>
-
         <section class="app-view" id="view-stats" data-view="stats" hidden>
           <div class="view-heading">
             <div><span class="section-kicker">INSIGHTS</span><h1>分析</h1></div>
@@ -259,7 +293,7 @@
 
       <nav class="bottom-nav" aria-label="主要導覽">
         <button type="button" data-nav-view="home" class="active">
-          <span>⌂</span>首頁
+          <span>≡</span>帳本
         </button>
         <button type="button" data-nav-view="inbox">
           <span class="nav-icon-wrap">✓<em
@@ -267,59 +301,8 @@
               hidden
             ></em></span>待處理
         </button>
-        <button type="button" data-nav-view="ledger"><span>≡</span>明細</button>
         <button type="button" data-nav-view="stats"><span>↗</span>分析</button>
       </nav>
-    </div>
-
-    <div class="sheet-backdrop" id="addSheetBackdrop" hidden>
-      <section
-        class="action-sheet"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="addSheetTitle"
-      >
-        <div class="sheet-handle"></div>
-        <div class="panel-title-row">
-          <strong id="addSheetTitle">新增資料</strong><button
-            type="button"
-            id="closeAddSheetBtn"
-            aria-label="關閉新增選單"
-          >
-            ✕
-          </button>
-        </div>
-        <button type="button" class="action-choice" id="addCashChoice">
-          <span>💵</span><span><strong>記一筆現金</strong><small
-            >輸入金額、分類與備註</small></span>
-        </button>
-        <button type="button" class="action-choice" id="addInvoiceChoice">
-          <span>🧾</span><span><strong>匯入發票明細</strong><small
-            >財政部載具消費明細 CSV</small></span>
-        </button>
-        <div class="cc-import-choice">
-          <div class="cc-choice-heading">
-            <span>💳</span><span><strong>匯入信用卡帳單</strong><small
-              >銀行可留空並由檔名自動判斷</small></span>
-          </div>
-          <input
-            type="text"
-            id="ccBankInput"
-            placeholder="銀行／卡片名稱（選填，可由檔名判斷）"
-            maxlength="20"
-          >
-          <button type="button" class="cc-file-select" id="addCcChoice">
-            選擇信用卡 CSV
-          </button>
-        </div>
-        <details class="import-help">
-          <summary>支援哪些匯入格式？</summary>
-          <p>
-            發票使用財政部電子發票平台的「載具消費明細」CSV；信用卡使用網路銀行下載或整理的
-            CSV 對帳單。可一次選取多個檔案，確認前會先顯示解析、重複及配對預覽。
-          </p>
-        </details>
-      </section>
     </div>
 
     <input type="file" id="invoiceFile" accept=".csv" multiple hidden><input
@@ -371,6 +354,11 @@
     </div>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <script
+      src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.4/dist/umd/supabase.min.js"
+    ></script>
+    <script src="js/supabase-config.js"></script>
+    <script src="js/cloud.js"></script>
     <script src="js/storage.js"></script>
     <script src="js/core.js"></script>
     <script src="js/render.js"></script>
@@ -378,5 +366,8 @@
     <script src="js/import-reconciliation.js"></script>
     <script src="js/ui.js"></script>
     <script src="js/backup-init.js"></script>
+    <script>
+      initializeCloudPanel();
+    </script>
   </body>
 </html>

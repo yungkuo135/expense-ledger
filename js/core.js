@@ -26,7 +26,6 @@ const dateInput = document.getElementById("dateInput");
 const saveBtn = document.getElementById("saveBtn");
 dateInput.value = toKey(new Date());
 const ledgerEl = document.getElementById("ledger");
-const todayStamp = document.getElementById("todayStamp");
 const toast = document.getElementById("toast");
 const searchInput = document.getElementById("searchInput");
 const statsMonthLabelEl = document.getElementById("statsMonthLabel");
@@ -192,6 +191,13 @@ function isCounted(e) {
   return true;
 }
 
+// Imported source totals remain authoritative for reconciliation even when
+// `amount` is later reduced to the user's personal share. Older records that
+// predate originalAmount retain their existing behavior.
+function reconciliationAmount(e) {
+  return Number.isFinite(e.originalAmount) ? e.originalAmount : e.amount;
+}
+
 // every month key currently believed to exist in storage — populated from
 // storageAdapter.list() on load, kept in sync by saveEntries() as it writes
 // or deletes month keys. A full save (clearAll, bulk import, etc.) needs
@@ -232,21 +238,6 @@ async function saveEntries(affectedMonths) {
   }
 }
 
-// records when this ledger's data was first ever created, and never
-// overwrites it afterward. This exists purely so version continuity can be
-// checked empirically instead of staying an open question forever: after
-// swapping in a new build of this file, if the footer still shows the same
-// original date, window.storage genuinely carried over; if it shows today's
-// date, this is a fresh, disconnected storage bucket and old data didn't
-// survive the version change.
-let ledgerCreatedAt = null;
-
-async function loadLedgerMeta() {
-  ledgerCreatedAt = await ledgerRepository.loadOrCreateLedgerMeta(
-    toKey(new Date()),
-  );
-}
-
 async function loadVendorAliases() {
   vendorAliases = await ledgerRepository.loadVendorAliases();
   vendorAliasGraphCache = null;
@@ -260,13 +251,6 @@ async function saveVendorAliases() {
     showToast("店家對應儲存失敗，之後可能會再次詢問這組配對");
     throw error;
   }
-}
-
-function renderLedgerMetaFooter() {
-  const el = document.getElementById("ledgerMetaFooter");
-  if (!el || !ledgerCreatedAt) return;
-  el.textContent =
-    `資料建立於 ${ledgerCreatedAt}——換版本後這個日期若沒變,代表資料有延續`;
 }
 
 function aliasKey(ccVendor, invVendor) {

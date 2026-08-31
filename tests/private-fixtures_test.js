@@ -94,7 +94,7 @@ function makeFakeDocument() {
 async function loadLedgerApp() {
   const html = await Deno.readTextFile(INDEX_URL);
   const scriptPaths = [...html.matchAll(/<script src="([^"]+)"\s*><\/script>/g)]
-    .map((match) => match[1]);
+    .map((match) => match[1]).filter((path) => !/^https?:\/\//.test(path));
   assert(scriptPaths.length > 0, "index.html 裡找不到應用程式 JavaScript");
   let source = (
     await Promise.all(
@@ -114,7 +114,6 @@ async function loadLedgerApp() {
       getEntries(){ return entries; },
       getVendorAliases(){ return vendorAliases; },
       LedgerRepository,
-      LocalStorageAdapter,
       STORAGE_KEYS,
       genericImportRows,
       validateBackupData,
@@ -355,39 +354,8 @@ Deno.test("LedgerRepository：分月儲存、刪除空月份與舊版遷移", as
   );
 });
 
-Deno.test("瀏覽器儲存：localStorage adapter 相容且寫入失敗會向上回報", async () => {
+Deno.test("儲存失敗：Repository 會向上回報寫入錯誤", async () => {
   const app = await loadLedgerApp();
-  const values = new Map();
-  const localStorage = {
-    get length() {
-      return values.size;
-    },
-    key(index) {
-      return [...values.keys()][index] ?? null;
-    },
-    getItem(key) {
-      return values.get(key) ?? null;
-    },
-    setItem(key, value) {
-      values.set(key, String(value));
-    },
-    removeItem(key) {
-      values.delete(key);
-    },
-  };
-  const adapter = new app.LocalStorageAdapter(localStorage);
-  adapter.set("expense-entries-2026-08", "[]");
-  assert(
-    adapter.get("expense-entries-2026-08").value === "[]" &&
-      adapter.list("expense-entries-").keys.length === 1,
-    "localStorage adapter 的 get/set/list 不相容",
-  );
-  adapter.delete("expense-entries-2026-08");
-  assert(
-    adapter.get("expense-entries-2026-08") === null,
-    "localStorage adapter 刪除失敗",
-  );
-
   const failingStorage = {
     get() {
       return null;
@@ -618,6 +586,90 @@ Deno.test({
       "產生匯入預覽後，現有帳本內容被修改",
     );
   },
+});
+
+Deno.test("分帳對帳：使用原始發票金額配對並保留個人支出金額", async () => {
+  const app = await loadLedgerApp();
+  const timestamp = new Date("2026-08-10T12:00:00").getTime();
+  app.setEntries([
+    {
+      id: "invoice-mine",
+      source: "invoice",
+      invoiceNo: "AB12345678",
+      vendor: "測試餐廳股份有限公司",
+      amount: 600,
+      originalAmount: 600,
+      date: "2026-08-10",
+      ts: timestamp,
+      matchedId: null,
+    },
+    {
+      id: "invoice-shared",
+      source: "invoice",
+      invoiceNo: "AB12345678",
+      vendor: "測試餐廳股份有限公司",
+      amount: 0,
+      originalAmount: 400,
+      date: "2026-08-10",
+      ts: timestamp,
+      matchedId: null,
+      edited: true,
+    },
+    {
+      id: "card-full-charge",
+      source: "creditcard",
+      vendor: "測試餐廳",
+      amount: 1000,
+      originalAmount: 1000,
+      date: "2026-08-10",
+      ts: timestamp,
+      matchedId: null,
+      reviewed: false,
+    },
+  ]);
+
+  assert(app.reconcile() === 1, "分帳後未依原始總額自動配對");
+  const entries = app.getEntries();
+  const card = entries.find((entry) => entry.id === "card-full-charge");
+  const invoiceItems = entries.filter((entry) => entry.source === "invoice");
+  assert(card.matchedId === "AB12345678", "信用卡沒有連到原發票");
+  assert(
+    invoiceItems.every((entry) => entry.matchedId === card.id),
+    "發票品項沒有完整連回信用卡",
+  );
+  assert(
+    invoiceItems.reduce((sum, entry) => sum + entry.amount, 0) === 600,
+    "配對改動了編輯後的個人支出金額",
+  );
+});
+
+Deno.test("舊資料對帳：缺少 originalAmount 時沿用目前金額", async () => {
+  const app = await loadLedgerApp();
+  const timestamp = new Date("2026-08-11T12:00:00").getTime();
+  app.setEntries([
+    {
+      id: "legacy-invoice",
+      source: "invoice",
+      invoiceNo: "CD12345678",
+      vendor: "舊資料商店",
+      amount: 250,
+      date: "2026-08-11",
+      ts: timestamp,
+      matchedId: null,
+    },
+    {
+      id: "legacy-card",
+      source: "creditcard",
+      vendor: "舊資料商店",
+      amount: 250,
+      date: "2026-08-11",
+      ts: timestamp,
+      matchedId: null,
+      reviewed: false,
+    },
+  ]);
+
+  assert(app.reconcile() === 1, "舊資料沒有 fallback 到目前金額配對");
 });
 
 Deno.test({

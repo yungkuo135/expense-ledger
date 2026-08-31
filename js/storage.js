@@ -20,73 +20,6 @@ const STORAGE_KEYS = Object.freeze({
   legacyMigration: "ledger-migration-entries-v1",
 });
 
-// Supports hosts that provide the original asynchronous window.storage API.
-class WindowStorageAdapter {
-  constructor(storage) {
-    this.storage = storage;
-  }
-
-  get(key) {
-    return this.storage.get(key);
-  }
-  set(key, value) {
-    return this.storage.set(key, value);
-  }
-  delete(key) {
-    return this.storage.delete(key);
-  }
-  list(prefix) {
-    return this.storage.list(prefix);
-  }
-}
-
-// Standard browser fallback. It preserves the adapter's {value} response
-// shape while using the widely supported synchronous localStorage API.
-class LocalStorageAdapter {
-  constructor(storage) {
-    this.storage = storage;
-  }
-
-  get(key) {
-    const value = this.storage.getItem(key);
-    return value === null ? null : { value };
-  }
-  set(key, value) {
-    this.storage.setItem(key, value);
-    return { ok: true };
-  }
-  delete(key) {
-    this.storage.removeItem(key);
-    return { ok: true };
-  }
-  list(prefix) {
-    const keys = [];
-    for (let i = 0; i < this.storage.length; i++) {
-      const key = this.storage.key(i);
-      if (key && key.startsWith(prefix)) keys.push(key);
-    }
-    return { keys };
-  }
-}
-
-class UnavailableStorageAdapter {
-  unavailable() {
-    throw new Error("此瀏覽器無法使用本機儲存空間");
-  }
-  get() {
-    return this.unavailable();
-  }
-  set() {
-    return this.unavailable();
-  }
-  delete() {
-    return this.unavailable();
-  }
-  list() {
-    return this.unavailable();
-  }
-}
-
 class HttpFileStorageAdapter {
   constructor(endpoint) {
     this.endpoint = endpoint;
@@ -126,39 +59,18 @@ class HttpFileStorageAdapter {
 
 function requestedStorageMode() {
   const location = window.location;
-  if (!location) return "window";
-  const fileRequested =
-    new URLSearchParams(location.search || "").get("storage") === "file";
-  return fileRequested && location.protocol === "http:" &&
+  if (!location) return "cloud";
+  const requested = new URLSearchParams(location.search || "").get("storage");
+  return requested === "file" && location.protocol === "http:" &&
       location.hostname === "127.0.0.1"
     ? "file"
-    : "window";
+    : "cloud";
 }
 
 const storageMode = requestedStorageMode();
-function browserStorageAdapter() {
-  const customStorage = window.storage;
-  if (
-    customStorage &&
-    ["get", "set", "delete", "list"].every((method) =>
-      typeof customStorage[method] === "function"
-    )
-  ) {
-    return new WindowStorageAdapter(customStorage);
-  }
-  try {
-    if (window.localStorage) {
-      return new LocalStorageAdapter(window.localStorage);
-    }
-  } catch (error) {
-    console.error("無法存取 localStorage", error);
-  }
-  return new UnavailableStorageAdapter();
-}
-
 const storageAdapter = storageMode === "file"
   ? new HttpFileStorageAdapter("/api/storage")
-  : browserStorageAdapter();
+  : new SupabaseStorageAdapter(expenseLedgerSupabase);
 
 class LedgerRepository {
   constructor(storage) {

@@ -309,13 +309,13 @@ function reconcile() {
       .forEach((e) => {
         if (!groups[e.invoiceNo]) {
           groups[e.invoiceNo] = {
-            sum: 0,
+            reconciliationSum: 0,
             ts: e.ts,
             vendor: e.vendor,
             items: [],
           };
         }
-        groups[e.invoiceNo].sum += e.amount;
+        groups[e.invoiceNo].reconciliationSum += reconciliationAmount(e);
         groups[e.invoiceNo].ts = Math.max(groups[e.invoiceNo].ts, e.ts);
         groups[e.invoiceNo].items.push(e);
       });
@@ -343,7 +343,7 @@ function reconcile() {
   ccs.forEach((cc) => {
     Object.keys(invoiceGroups).forEach((no) => {
       const g = invoiceGroups[no];
-      if (Math.abs(g.sum - cc.amount) >= 0.01) return;
+      if (Math.abs(g.reconciliationSum - cc.amount) >= 0.01) return;
       const dateDiff = Math.abs(g.ts - cc.ts);
       if (dateDiff > maxWindow) return;
       if (!namesMatch(cc.vendor || cc.note, g.vendor)) return;
@@ -387,13 +387,13 @@ function reconcile() {
       if (wasSuggestionRejected(cc, no)) return;
       const dateDiff = Math.abs(g.ts - cc.ts);
       if (dateDiff > maxWindow) return;
-      const gap = g.sum - cc.amount;
+      const gap = g.reconciliationSum - cc.amount;
       if (Math.abs(gap) < 0.01) {
         candidates.push({ cc, no, dateDiff, gap: 0 });
         return;
       }
       if (
-        gap > 0 && gap <= g.sum * 0.5 && gap <= 500 &&
+        gap > 0 && gap <= g.reconciliationSum * 0.5 && gap <= 500 &&
         namesMatch(cc.vendor || cc.note, g.vendor)
       ) {
         candidates.push({ cc, no, dateDiff, gap });

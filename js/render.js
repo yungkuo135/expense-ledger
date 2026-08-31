@@ -46,7 +46,17 @@ function renderItemRow(e, opts) {
     <span class="note ${isPlaceholder ? "empty" : ""}" data-id="${
     escapeAttribute(e.id)
   }" title="${escapeAttribute(noteText)}">${escapeHtml(noteText)}</span>
-    <span class="amt" data-id="${escapeAttribute(e.id)}">${fmt(e.amount)}</span>
+    <span class="amount-stack">
+      <span class="amt" data-id="${escapeAttribute(e.id)}">${
+    fmt(e.amount)
+  }</span>
+      ${
+    Number.isFinite(e.originalAmount) &&
+      Math.abs(e.originalAmount - e.amount) >= 0.01
+      ? `<span class="original-amount">原 ${fmt(e.originalAmount)}</span>`
+      : ""
+  }
+    </span>
     ${
     e.edited
       ? `<span class="edited-badge" title="原始金額 ${
@@ -69,7 +79,7 @@ function renderItemRow(e, opts) {
   if (e.source === "creditcard" && !e.matchedId && e.suggestedInvoiceNo) {
     const g = invoiceGroupsForSuggestion(e.suggestedInvoiceNo);
     if (g) {
-      const gap = g.sum - e.amount;
+      const gap = g.reconciliationSum - e.amount;
       const wrap = document.createElement("div");
       wrap.appendChild(row);
       const strip = document.createElement("div");
@@ -108,7 +118,10 @@ function invoiceGroupsForSuggestion(invoiceNo) {
   );
   if (items.length === 0) return null;
   return {
-    sum: items.reduce((s, i) => s + i.amount, 0),
+    reconciliationSum: items.reduce(
+      (sum, item) => sum + reconciliationAmount(item),
+      0,
+    ),
     vendor: items[0].vendor || "",
     items,
   };
@@ -142,9 +155,10 @@ function buildDayBlocks(dayEntries) {
 // doesn't dump a huge scrolling list; user can tap a month header to
 // expand/collapse, and the choice persists across re-renders (edits, etc.)
 let expandedMonths = null;
-// same idea, but tracked separately for the 待確認 section — someone might
-// want the main ledger collapsed to one month while still browsing several
-// months of pending items, or vice versa, so these shouldn't share state.
+// Invoice details are collapsed by default to keep month views scannable.
+// The choice survives edits and other re-renders for the current page session.
+const expandedInvoices = new Set();
+let openingInvoiceNo = null;
 function monthKeyOf(dateKey) {
   return dateKey.slice(0, 7);
 } // 'YYYY-MM'
@@ -630,10 +644,6 @@ function renderSearchResults(visible) {
 }
 
 function render() {
-  const todayK = toKey(new Date());
-  const todayTotal = entries.filter((e) => e.date === todayK && isCounted(e))
-    .reduce((s, e) => s + e.amount, 0);
-  todayStamp.textContent = fmt(todayTotal);
   renderStats();
   renderQualityCard();
   renderImportHistory();
@@ -733,6 +743,10 @@ function render() {
           const items = block.items;
           const vendor = items[0].vendor || "";
           const subtotal = items.reduce((s, i) => s + i.amount, 0);
+          const originalSubtotal = items.reduce(
+            (sum, item) => sum + reconciliationAmount(item),
+            0,
+          );
           const ccMatch = items[0].matchedId
             ? entries.find((e) => e.id === items[0].matchedId)
             : null;
@@ -740,8 +754,18 @@ function render() {
             isPlatformFeeOnlyInvoice(items[0]);
           const wrap = document.createElement("div");
           wrap.className = "invoice-group";
+          const invoiceExpanded = expandedInvoices.has(block.invoiceNo);
           const headRow = document.createElement("div");
           headRow.className = "invoice-head";
+          headRow.setAttribute("role", "button");
+          headRow.setAttribute("tabindex", "0");
+          headRow.setAttribute("aria-expanded", String(invoiceExpanded));
+          headRow.setAttribute(
+            "aria-label",
+            `${vendor || "發票"}，${items.length} 個品項，${
+              invoiceExpanded ? "收合明細" : "展開明細"
+            }`,
+          );
           headRow.innerHTML = `
             <div class="invoice-head-top">
               <span class="src">🧾</span>
@@ -750,12 +774,43 @@ function render() {
           }</span>
             </div>
             <div class="invoice-head-bottom">
-              <span class="invoice-no-chip">${
+              <span class="invoice-meta">
+                <span class="invoice-no-chip">${
             escapeHtml(block.invoiceNo)
           }</span>
-              <span class="invoice-sub">${fmt(subtotal)}</span>
+                <span class="invoice-item-count">${items.length} 個品項</span>
+              </span>
+              <span class="amount-stack">
+                <span class="invoice-sub">${fmt(subtotal)}</span>
+                ${
+            Math.abs(originalSubtotal - subtotal) >= 0.01
+              ? `<span class="original-amount">原 ${
+                fmt(originalSubtotal)
+              }</span>`
+              : ""
+          }
+              </span>
+              <span class="invoice-toggle" aria-hidden="true">${
+            invoiceExpanded ? "▴" : "▾"
+          }</span>
             </div>
           `;
+          const toggleInvoice = () => {
+            if (expandedInvoices.has(block.invoiceNo)) {
+              expandedInvoices.delete(block.invoiceNo);
+              openingInvoiceNo = null;
+            } else {
+              expandedInvoices.add(block.invoiceNo);
+              openingInvoiceNo = block.invoiceNo;
+            }
+            render();
+          };
+          headRow.addEventListener("click", toggleInvoice);
+          headRow.addEventListener("keydown", (event) => {
+            if (event.key !== "Enter" && event.key !== " ") return;
+            event.preventDefault();
+            toggleInvoice();
+          });
           wrap.appendChild(headRow);
 
           // credit-card reconciliation info renders as its own visible,
@@ -804,6 +859,10 @@ function render() {
 
           const itemsWrap = document.createElement("div");
           itemsWrap.className = "invoice-items";
+          if (invoiceExpanded && openingInvoiceNo === block.invoiceNo) {
+            itemsWrap.classList.add("is-opening");
+          }
+          itemsWrap.hidden = !invoiceExpanded;
           items.sort((a, b) => b.ts - a.ts).forEach((item) => {
             itemsWrap.appendChild(renderItemRow(item, { hideSrc: true }));
           });
@@ -819,4 +878,5 @@ function render() {
   });
 
   attachLedgerHandlers();
+  openingInvoiceNo = null;
 }

@@ -9,6 +9,8 @@ const STATIC_ASSETS = new Map([
   }],
   ...[
     "storage",
+    "supabase-config",
+    "cloud",
     "core",
     "render",
     "interactions",
@@ -293,6 +295,7 @@ export function createRequestHandler(store) {
 if (import.meta.main) {
   const store = new JsonFileStorageStore();
   await store.initialize();
+  console.log(`雲端帳本：http://${HOSTNAME}:${PORT}/`);
   console.log(`本機測試模式：http://${HOSTNAME}:${PORT}/?storage=file`);
   console.log(`檔案狀態：${STATE_FILE_URL.pathname}`);
   Deno.serve({ hostname: HOSTNAME, port: PORT }, createRequestHandler(store));

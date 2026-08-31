@@ -16,14 +16,12 @@
 deno task dev
 ```
 
-接著開啟終端機顯示的網址（預設為
-`http://127.0.0.1:8000/?storage=file`）。此開發模式會將測試狀態寫入
+正式雲端帳本請開啟 `http://127.0.0.1:8000/` 並登入。終端機另外顯示的
+`http://127.0.0.1:8000/?storage=file` 僅供本機測試，會將測試狀態寫入
 `test-fixtures/private/state`；整個 `test-fixtures/private` 目錄已由
 `.gitignore` 排除。
 
-也可以直接以瀏覽器開啟 `index.html`。一般模式優先相容既有的 `window.storage`，
-否則使用標準 `localStorage` 保存資料；若兩者都無法使用，應用程式會停止資料操作，
-避免畫面顯示成功但實際沒有保存。
+一般模式使用 Supabase 雲端帳本；未登入時不會載入或顯示帳務資料。
 
 ## 測試
 
@@ -38,8 +36,8 @@ deno task test
 
 - `test-fixtures/private/`、`.env*`、日誌與建置輸出不會納入版本控制。
 - 提交前請執行 `git status --short --ignored`，確認帳務檔案顯示為 ignored。
-- 瀏覽器端只能使用可公開的設定。未來串接 Supabase 時，禁止將 service-role key
-  或其他 secret 放進前端程式碼。
+- 瀏覽器端只能使用可公開的 Supabase Project URL 與 publishable key，禁止將
+  service-role key、資料庫密碼或其他 secret 放進前端程式碼。
 - 建議定期使用應用程式內的「匯出完整備份」，並將備份保存在 repository 之外。
 
 ## 專案結構
@@ -54,9 +52,28 @@ tests/            Deno 測試
 
 ## 發展方向
 
-目前仍是單頁原生 JavaScript 應用程式，資料主要保存在本機。後續規劃以 Supabase
-Auth 與 PostgreSQL 支援同一使用者跨裝置同步，同時保留既有 JSON
-備份格式與匯入／對帳行為。
+目前仍是單頁原生 JavaScript 應用程式，以 Supabase Auth 與 PostgreSQL
+支援同一使用者跨裝置使用，同時保留既有 JSON 備份格式與匯入／對帳行為。
+
+## Supabase 雲端模式（第一階段）
+
+雲端模式以相容既有 storage key/value 格式為優先，Supabase
+是正式帳本的唯一資料來源。瀏覽器過去留下的 localStorage 不會自動刪除，
+但應用程式不再讀寫它。
+
+1. 在 Supabase SQL Editor 執行
+   `supabase/migrations/202608280001_create_ledger_storage.sql`。
+2. 將 Project URL 與 `sb_publishable_...` 填入
+   `js/supabase-config.js`。這兩項是瀏覽器可公開設定；禁止填入
+   secret、service-role key 或資料庫密碼。
+3. 先在 Supabase Authentication 建立個人帳號，完成後關閉新使用者註冊。
+4. 以 `deno task dev` 啟動後，在帳號登入畫面登入；登入後右上方會顯示
+   「雲端已同步」。
+5. 若需將既有本機帳本遷移到全新的空白雲端，可先匯出完整 JSON
+   備份，再於雲端模式使用「還原備份」。
+
+資料表已啟用 Row Level Security；登入者只能讀寫 `user_id` 等於自己 Auth ID
+的資料。JSON 還原會依紀錄 ID 合併，不會清空既有帳本。
 
 ## 授權
 

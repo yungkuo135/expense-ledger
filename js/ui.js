@@ -34,7 +34,7 @@ function workboxCount() {
 }
 
 function setActiveView(view) {
-  const allowed = new Set(["home", "inbox", "ledger", "stats"]);
+  const allowed = new Set(["home", "inbox", "stats"]);
   activeView = allowed.has(view) ? view : "home";
   document.querySelectorAll(".app-view").forEach((section) => {
     const active = section.getAttribute("data-view") === activeView;
@@ -50,22 +50,7 @@ function setActiveView(view) {
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
-function openAddSheet() {
-  const backdrop = document.getElementById("addSheetBackdrop");
-  backdrop.hidden = false;
-  document.getElementById("addActionBtn").setAttribute("aria-expanded", "true");
-}
-
-function closeAddSheet() {
-  document.getElementById("addSheetBackdrop").hidden = true;
-  document.getElementById("addActionBtn").setAttribute(
-    "aria-expanded",
-    "false",
-  );
-}
-
 function openCashEntry() {
-  closeAddSheet();
   setActiveView("home");
   const panel = document.getElementById("cashEntryPanel");
   panel.hidden = false;
@@ -131,6 +116,7 @@ function hasActiveLedgerFilters() {
 
 function renderFilterSummary() {
   const wrap = document.getElementById("filterSummary");
+  const toolSummary = document.getElementById("filterToolsSummary");
   const labels = [];
   if (searchQuery) labels.push(["search", `搜尋：${searchInput.value.trim()}`]);
   if (ledgerFilters.source !== "all") {
@@ -152,9 +138,11 @@ function renderFilterSummary() {
     ]);
   }
   if (!labels.length) {
+    toolSummary.textContent = "搜尋與篩選";
     wrap.innerHTML = '<span class="filter-empty">目前顯示全部明細</span>';
     return;
   }
+  toolSummary.textContent = `搜尋與篩選・${labels.length} 個條件`;
   wrap.innerHTML =
     labels.map(([key, label]) =>
       `<button type="button" data-clear-filter="${key}">${
@@ -192,31 +180,14 @@ function clearLedgerFilter(key) {
   render();
 }
 
-function renderHomeSummary() {
-  const currentMonth = monthKeyOf(toKey(new Date()));
-  const monthEntries = entries.filter((e) =>
-    monthKeyOf(e.date) === currentMonth && isCounted(e)
-  );
-  document.getElementById("homeMonthTotal").textContent = fmt(
-    monthEntries.reduce((sum, e) => sum + e.amount, 0),
-  );
-  document.getElementById("homeMonthCount").textContent =
-    `${monthEntries.length} 筆`;
-  const pending = workboxCount();
-  document.getElementById("homePendingCount").textContent = `${pending} 項`;
-  document.getElementById("homePendingBtn").classList.toggle(
-    "has-items",
-    pending > 0,
-  );
-  document.getElementById("workboxTotal").textContent = pending
-    ? `${pending} 項`
+function renderWorkbox() {
+  const pendingCount = workboxCount();
+  document.getElementById("workboxTotal").textContent = pendingCount
+    ? `${pendingCount} 項`
     : "已完成";
   const badge = document.getElementById("navPendingBadge");
-  badge.hidden = pending === 0;
-  badge.textContent = pending > 99 ? "99+" : String(pending);
-}
-
-function renderWorkbox() {
+  badge.hidden = pendingCount === 0;
+  badge.textContent = pendingCount > 99 ? "99+" : String(pendingCount);
   const root = document.getElementById("workboxLedger");
   const unclassifiedCount = qualityBuckets().unclassified.length;
   const aiWorkflow = document.getElementById("aiWorkflow");
@@ -282,7 +253,6 @@ function renderWorkbox() {
 }
 
 function renderAppChrome() {
-  renderHomeSummary();
   renderFilterSummary();
   renderWorkbox();
 }
@@ -361,7 +331,6 @@ async function openImportPreview(type, files) {
     showToast("資料載入中，請稍等一下再試");
     return;
   }
-  closeAddSheet();
   const backdrop = document.getElementById("importPreviewBackdrop");
   const loading = document.getElementById("importPreviewLoading");
   const content = document.getElementById("importPreviewContent");
@@ -440,20 +409,6 @@ function initializeUI() {
   );
   document.getElementById("addActionBtn").addEventListener(
     "click",
-    openAddSheet,
-  );
-  document.getElementById("closeAddSheetBtn").addEventListener(
-    "click",
-    closeAddSheet,
-  );
-  document.getElementById("addSheetBackdrop").addEventListener(
-    "click",
-    (event) => {
-      if (event.target === event.currentTarget) closeAddSheet();
-    },
-  );
-  document.getElementById("addCashChoice").addEventListener(
-    "click",
     openCashEntry,
   );
   document.getElementById("closeCashEntryBtn").addEventListener(
@@ -468,11 +423,6 @@ function initializeUI() {
     "click",
     () => document.getElementById("ccFile").click(),
   );
-  document.getElementById("homePendingBtn").addEventListener(
-    "click",
-    () => setActiveView("inbox"),
-  );
-
   document.getElementById("invoiceFile").addEventListener("change", (event) => {
     const files = Array.from(event.target.files || []);
     event.target.value = "";
