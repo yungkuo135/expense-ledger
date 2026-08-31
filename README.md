@@ -27,7 +27,9 @@ deno task dev
 
 正式部署使用 HTTPS 後，可透過手機瀏覽器的「加入主畫面」安裝為 PWA。PWA 會快取
 應用程式的靜態外殼，但帳務資料仍只讀寫 Supabase；離線時不可新增、編輯、匯入或
-還原資料。`?storage=file` 測試模式不使用 Service Worker。
+還原資料。`?storage=file` 測試模式不使用 Service Worker。 Manifest、Service
+Worker 與靜態快取使用相對 scope，可部署在 GitHub Pages 的 `/expense-ledger/` 等
+repository 子路徑。
 
 ## 測試
 

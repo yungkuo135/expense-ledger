@@ -98,11 +98,22 @@ Deno.test("本機測試伺服器：API 支援 get/set/list/delete 且拒絕跨�
     ),
     "PWA manifest Content-Type 錯誤",
   );
+  const manifest = await manifestResponse.json();
+  assert(
+    manifest.start_url === "./" && manifest.scope === "./",
+    "PWA manifest 必須支援 GitHub Pages 子路徑",
+  );
 
   const serviceWorkerResponse = await handler(
     new Request(`${origin}/sw.js`, { headers: { Origin: origin } }),
   );
   assert(serviceWorkerResponse.status === 200, "Service Worker 無法提供");
+  assert(
+    !(await serviceWorkerResponse.text()).includes(
+      'caches.match("/index.html")',
+    ),
+    "Service Worker 離線頁面不可固定在網域根目錄",
+  );
 
   const iconResponse = await handler(
     new Request(`${origin}/icons/icon-192.png`, {

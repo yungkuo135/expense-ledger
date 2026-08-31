@@ -27,7 +27,7 @@
 
   window.addEventListener("load", async () => {
     try {
-      await navigator.serviceWorker.register("/sw.js", { scope: "/" });
+      await navigator.serviceWorker.register("./sw.js", { scope: "./" });
     } catch (error) {
       console.warn("PWA Service Worker 註冊失敗", error);
     }

@@ -1,22 +1,24 @@
-const CACHE_NAME = "expense-ledger-shell-v1";
+const CACHE_NAME = "expense-ledger-shell-v2";
 const APP_SHELL = [
-  "/",
-  "/index.html",
-  "/manifest.webmanifest",
-  "/css/styles.css",
-  "/icons/icon-192.png",
-  "/icons/icon-512.png",
-  "/js/supabase-config.js",
-  "/js/cloud.js",
-  "/js/storage.js",
-  "/js/core.js",
-  "/js/render.js",
-  "/js/interactions.js",
-  "/js/import-reconciliation.js",
-  "/js/ui.js",
-  "/js/backup-init.js",
-  "/js/pwa.js",
-];
+  "./",
+  "index.html",
+  "manifest.webmanifest",
+  "css/styles.css",
+  "icons/icon-192.png",
+  "icons/icon-512.png",
+  "js/supabase-config.js",
+  "js/cloud.js",
+  "js/storage.js",
+  "js/core.js",
+  "js/render.js",
+  "js/interactions.js",
+  "js/import-reconciliation.js",
+  "js/ui.js",
+  "js/backup-init.js",
+  "js/pwa.js",
+].map((path) => new URL(path, self.registration.scope).href);
+const OFFLINE_PAGE = new URL("index.html", self.registration.scope).href;
+const API_PATH = new URL("api/", self.registration.scope).pathname;
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -46,7 +48,7 @@ self.addEventListener("fetch", (event) => {
   if (
     request.method !== "GET" ||
     url.origin !== self.location.origin ||
-    url.pathname.startsWith("/api/") ||
+    url.pathname.startsWith(API_PATH) ||
     url.searchParams.get("storage") === "file"
   ) {
     return;
@@ -54,12 +56,12 @@ self.addEventListener("fetch", (event) => {
 
   if (request.mode === "navigate") {
     event.respondWith(
-      fetch(request).catch(() => caches.match("/index.html")),
+      fetch(request).catch(() => caches.match(OFFLINE_PAGE)),
     );
     return;
   }
 
-  if (!APP_SHELL.includes(url.pathname)) return;
+  if (!APP_SHELL.includes(url.href)) return;
   event.respondWith(
     caches.match(request).then((cached) => cached || fetch(request)),
   );
