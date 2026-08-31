@@ -48,7 +48,16 @@ css/              畫面樣式
 js/               儲存、匯入、對帳與 UI 邏輯
 scripts/          本機開發伺服器與測試資料輔助工具
 tests/            Deno 測試
+docs/             專案狀態、技術決策與後續待辦
 ```
+
+## 專案交接文件
+
+- [目前狀態](docs/PROJECT_STATUS.md)
+- [技術決策](docs/DECISIONS.md)
+- [後續待辦](docs/BACKLOG.md)
+
+開始新的開發對話前，請先閱讀上述文件、`AGENTS.md` 與 `git status`。
 
 ## 發展方向
 
