@@ -23,6 +23,12 @@ deno task dev
 
 一般模式使用 Supabase 雲端帳本；未登入時不會載入或顯示帳務資料。
 
+## 安裝到手機
+
+正式部署使用 HTTPS 後，可透過手機瀏覽器的「加入主畫面」安裝為 PWA。PWA 會快取
+應用程式的靜態外殼，但帳務資料仍只讀寫 Supabase；離線時不可新增、編輯、匯入或
+還原資料。`?storage=file` 測試模式不使用 Service Worker。
+
 ## 測試
 
 ```bash

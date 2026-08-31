@@ -86,6 +86,31 @@ Deno.test("本機測試伺服器：API 支援 get/set/list/delete 且拒絕跨�
   );
   assert(uiResponse.status === 200, "UI 模組無法由本機測試伺服器提供");
 
+  const manifestResponse = await handler(
+    new Request(`${origin}/manifest.webmanifest`, {
+      headers: { Origin: origin },
+    }),
+  );
+  assert(manifestResponse.status === 200, "PWA manifest 無法提供");
+  assert(
+    manifestResponse.headers.get("Content-Type")?.startsWith(
+      "application/manifest+json",
+    ),
+    "PWA manifest Content-Type 錯誤",
+  );
+
+  const serviceWorkerResponse = await handler(
+    new Request(`${origin}/sw.js`, { headers: { Origin: origin } }),
+  );
+  assert(serviceWorkerResponse.status === 200, "Service Worker 無法提供");
+
+  const iconResponse = await handler(
+    new Request(`${origin}/icons/icon-192.png`, {
+      headers: { Origin: origin },
+    }),
+  );
+  assert(iconResponse.status === 200, "PWA icon 無法提供");
+
   const setResponse = await handler(
     new Request(`${origin}/api/storage`, {
       method: "PUT",

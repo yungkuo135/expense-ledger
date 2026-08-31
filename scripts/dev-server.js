@@ -7,6 +7,24 @@ const STATIC_ASSETS = new Map([
     url: new URL("css/styles.css", PROJECT_ROOT),
     contentType: "text/css; charset=utf-8",
   }],
+  ["/manifest.webmanifest", {
+    url: new URL("manifest.webmanifest", PROJECT_ROOT),
+    contentType: "application/manifest+json; charset=utf-8",
+  }],
+  ["/sw.js", {
+    url: new URL("sw.js", PROJECT_ROOT),
+    contentType: "text/javascript; charset=utf-8",
+  }],
+  ["/icons/icon-192.png", {
+    url: new URL("icons/icon-192.png", PROJECT_ROOT),
+    contentType: "image/png",
+    binary: true,
+  }],
+  ["/icons/icon-512.png", {
+    url: new URL("icons/icon-512.png", PROJECT_ROOT),
+    contentType: "image/png",
+    binary: true,
+  }],
   ...[
     "storage",
     "supabase-config",
@@ -17,6 +35,7 @@ const STATIC_ASSETS = new Map([
     "import-reconciliation",
     "ui",
     "backup-init",
+    "pwa",
   ].map((name) => [
     `/js/${name}.js`,
     {
@@ -235,7 +254,10 @@ export function createRequestHandler(store) {
         if (request.method !== "GET") {
           return errorResponse("Method not allowed", 405);
         }
-        return new Response(await Deno.readTextFile(staticAsset.url), {
+        const body = staticAsset.binary
+          ? await Deno.readFile(staticAsset.url)
+          : await Deno.readTextFile(staticAsset.url);
+        return new Response(body, {
           headers: {
             "Content-Type": staticAsset.contentType,
             "Cache-Control": "no-store",

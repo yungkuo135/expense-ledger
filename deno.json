@@ -1,6 +1,6 @@
 {
   "tasks": {
-    "dev": "deno run --allow-net=127.0.0.1:8000 --allow-read=index.html,css,js,test-fixtures/private/state --allow-write=test-fixtures/private/state scripts/dev-server.js",
-    "test": "deno test --allow-read=index.html,css,js,tests,test-fixtures/private"
+    "dev": "deno run --allow-net=127.0.0.1:8000 --allow-read=index.html,manifest.webmanifest,sw.js,css,icons,js,test-fixtures/private/state --allow-write=test-fixtures/private/state scripts/dev-server.js",
+    "test": "deno test --allow-read=index.html,manifest.webmanifest,sw.js,css,icons,js,tests,test-fixtures/private"
   }
 }
