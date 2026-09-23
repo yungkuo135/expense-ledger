@@ -784,7 +784,11 @@ async function importOneCreditCardFile(file, bankLabel) {
 
 // accepts a single File, a FileList, or an array of Files, same as
 // importInvoiceCSV — lets one call cover both single- and multi-select.
-async function importCreditCardCSV(fileOrFiles, bankLabel) {
+async function importCreditCardCSV(
+  fileOrFiles,
+  bankLabel,
+  statementMonth = "",
+) {
   const files = fileOrFiles
     ? (fileOrFiles.length !== undefined
       ? Array.from(fileOrFiles)
@@ -872,6 +876,18 @@ async function importCreditCardCSV(fileOrFiles, bankLabel) {
     await saveImportBatches();
     await saveEntries();
     render();
+  }
+  if (!unrecognizedFiles.length && !emptyFiles.length) {
+    try {
+      await markCreditCardStatementsImported(
+        statementMonth || creditCardPlanMonthKey(),
+        [...banksUsed],
+        files.map((file) => file.name),
+      );
+    } catch (error) {
+      console.error("信用卡帳務已匯入，但月度清單更新失敗", error);
+      parts.push("；帳務已匯入，但月度清單更新失敗");
+    }
   }
   showToast(parts.join(""));
 }

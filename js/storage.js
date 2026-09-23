@@ -17,6 +17,7 @@ const STORAGE_KEYS = Object.freeze({
   ledgerMeta: "ledger-meta",
   vendorAliases: "vendor-aliases",
   importBatches: "import-batches-v1",
+  creditCardImportPlan: "credit-card-import-plan-v1",
   legacyMigration: "ledger-migration-entries-v1",
 });
 
@@ -206,6 +207,18 @@ class LedgerRepository {
     return this.storage.set(
       STORAGE_KEYS.importBatches,
       JSON.stringify(batches.slice(0, 20)),
+    );
+  }
+
+  async loadCreditCardImportPlan() {
+    const res = await this.storage.get(STORAGE_KEYS.creditCardImportPlan);
+    return res ? JSON.parse(res.value) : null;
+  }
+
+  saveCreditCardImportPlan(plan) {
+    return this.storage.set(
+      STORAGE_KEYS.creditCardImportPlan,
+      JSON.stringify(plan),
     );
   }
 }

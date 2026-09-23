@@ -128,6 +128,9 @@ async function loadLedgerApp() {
       parseAiClassifyResult,
       applyAiClassificationPairs,
       autoReviewHighConfidenceCreditCards,
+      normalizeCreditCardImportPlan,
+      creditCardPlanCardId,
+      inferStatementMonth,
       learnVendorAlias,
       unmatchReconciliation
     };
@@ -150,6 +153,33 @@ async function loadLedgerApp() {
   const factory = new AsyncFunction("window", "document", "navigator", source);
   return await factory(fakeWindow, fakeDocument, fakeNavigator);
 }
+
+Deno.test("信用卡帳單清單：辨識固定銀行與帳單月份", async () => {
+  const app = await loadLedgerApp();
+  assert(
+    app.creditCardPlanCardId("永豐銀行信用卡") === "sinopac",
+    "未辨識永豐",
+  );
+  assert(app.creditCardPlanCardId("台北富邦") === "fubon", "未辨識富邦");
+  assert(app.creditCardPlanCardId("國泰世華") === "cathay", "未辨識國泰");
+  assert(app.creditCardPlanCardId("台新國際銀行") === "taishin", "未辨識台新");
+  assert(
+    app.inferStatementMonth([{ name: "永豐信用卡帳單_202609.csv" }]) ===
+      "2026-09",
+    "未從檔名辨識帳單月份",
+  );
+});
+
+Deno.test("信用卡帳單清單：無效設定回復四家銀行與 27 日提醒", async () => {
+  const app = await loadLedgerApp();
+  const plan = app.normalizeCreditCardImportPlan(null);
+  assert(plan.reminderDay === 27, "預設提醒日錯誤");
+  assert(
+    JSON.stringify(plan.cards.map((card) => card.name)) ===
+      JSON.stringify(["永豐", "富邦", "國泰", "台新"]),
+    "預設銀行清單錯誤",
+  );
+});
 
 function fixtureFile(fixture) {
   return {

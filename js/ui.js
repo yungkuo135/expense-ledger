@@ -290,6 +290,9 @@ function renderImportPreview(summary) {
       : `${summary.dateFrom} ～ ${summary.dateTo}`)
     : "沒有可匯入日期";
   const warnings = previewWarningList(summary);
+  const statementMonth = summary.type === "creditcard"
+    ? (summary.statementMonth || creditCardPlanMonthKey())
+    : "";
   content.innerHTML = `
     <div class="preview-file-list"><strong>${
     summary.type === "invoice" ? "發票明細" : "信用卡帳單"
@@ -312,6 +315,12 @@ function renderImportPreview(summary) {
         summary.anyGuessed ? "（由檔名判斷）" : ""
       }</dd></div>`
       : ""
+  }${
+    summary.type === "creditcard"
+      ? `<div><dt>帳單月份</dt><dd><input type="month" id="statementMonthInput" value="${
+        escapeHtml(statementMonth)
+      }" aria-label="帳單月份"></dd></div>`
+      : ""
   }<div><dt>自動確認</dt><dd>${summary.autoReviewed} 筆信用卡消費</dd></div><div><dt>歷史分類</dt><dd>${summary.historyClassified} 筆</dd></div></dl>
     ${
     warnings.length
@@ -322,6 +331,25 @@ function renderImportPreview(summary) {
   }
     <p class="preview-safety-note">目前只是預覽，按下「確認匯入」前不會寫入帳本。</p>`;
   content.hidden = false;
+  const monthInput = document.getElementById("statementMonthInput");
+  if (monthInput) {
+    monthInput.addEventListener("change", () => {
+      if (importPreviewState) {
+        importPreviewState.statementMonth = monthInput.value;
+      }
+    });
+  }
+}
+
+function inferStatementMonth(files, fallback = creditCardPlanMonthKey()) {
+  const months = new Set();
+  files.forEach((file) => {
+    const match = String(file.name || "").match(
+      /(?:^|\D)(20\d{2})[-_]?((?:0[1-9])|(?:1[0-2]))(?:\D|$)/,
+    );
+    if (match) months.add(`${match[1]}-${match[2]}`);
+  });
+  return months.size === 1 ? [...months][0] : fallback;
 }
 
 async function openImportPreview(type, files) {
@@ -345,7 +373,21 @@ async function openImportPreview(type, files) {
     : "";
   try {
     const summary = await prepareImportPreview(type, selected, bankLabel);
-    importPreviewState = { type, files: selected, bankLabel, summary };
+    const statementMonth = type === "creditcard"
+      ? inferStatementMonth(
+        selected,
+        document.getElementById("cardImportMonth").value ||
+          creditCardPlanMonthKey(),
+      )
+      : "";
+    summary.statementMonth = statementMonth;
+    importPreviewState = {
+      type,
+      files: selected,
+      bankLabel,
+      statementMonth,
+      summary,
+    };
     loading.hidden = true;
     renderImportPreview(summary);
     confirm.disabled = false;
@@ -364,7 +406,13 @@ async function confirmImportPreview() {
   button.textContent = "匯入中…";
   try {
     if (state.type === "invoice") await importInvoiceCSV(state.files);
-    else await importCreditCardCSV(state.files, state.bankLabel);
+    else {
+      await importCreditCardCSV(
+        state.files,
+        state.bankLabel,
+        state.statementMonth,
+      );
+    }
     document.getElementById("importPreviewBackdrop").hidden = true;
     importPreviewState = null;
     const hasUnclassified = qualityBuckets().unclassified.length > 0;
@@ -422,6 +470,10 @@ function initializeUI() {
   document.getElementById("addCcChoice").addEventListener(
     "click",
     () => document.getElementById("ccFile").click(),
+  );
+  document.getElementById("cardImportMonth").addEventListener(
+    "change",
+    renderCreditCardImportChecklist,
   );
   document.getElementById("invoiceFile").addEventListener("change", (event) => {
     const files = Array.from(event.target.files || []);

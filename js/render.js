@@ -308,6 +308,164 @@ async function saveImportBatches() {
     throw error;
   }
 }
+
+function normalizeCreditCardImportPlan(plan) {
+  const fallback = JSON.parse(JSON.stringify(DEFAULT_CREDIT_CARD_IMPORT_PLAN));
+  if (!plan || typeof plan !== "object" || Array.isArray(plan)) return fallback;
+  const cards = Array.isArray(plan.cards) && plan.cards.length
+    ? plan.cards.filter((card) =>
+      card && typeof card.id === "string" && typeof card.name === "string"
+    )
+    : fallback.cards;
+  return {
+    version: 1,
+    reminderDay: Number.isInteger(plan.reminderDay) && plan.reminderDay >= 1 &&
+        plan.reminderDay <= 31
+      ? plan.reminderDay
+      : fallback.reminderDay,
+    cards,
+    months: plan.months && typeof plan.months === "object" &&
+        !Array.isArray(plan.months)
+      ? plan.months
+      : {},
+  };
+}
+
+async function loadCreditCardImportPlan() {
+  creditCardImportPlan = normalizeCreditCardImportPlan(
+    await ledgerRepository.loadCreditCardImportPlan(),
+  );
+}
+
+async function saveCreditCardImportPlan() {
+  await ledgerRepository.saveCreditCardImportPlan(creditCardImportPlan);
+}
+
+function creditCardPlanMonthKey(now = new Date()) {
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function creditCardPlanCardId(bank) {
+  const value = String(bank || "").replace(/銀行|信用卡|卡片|\s/g, "");
+  const aliases = {
+    sinopac: ["永豐", "永豐商業"],
+    fubon: ["富邦", "台北富邦"],
+    cathay: ["國泰", "國泰世華"],
+    taishin: ["台新", "台新國際"],
+  };
+  return Object.entries(aliases).find(([, names]) =>
+    names.some((name) => value.includes(name))
+  )?.[0] || null;
+}
+
+async function markCreditCardStatementsImported(month, banks, files) {
+  if (!/^\d{4}-\d{2}$/.test(month)) return;
+  const ids = [
+    ...new Set((banks || []).map(creditCardPlanCardId).filter(Boolean)),
+  ];
+  if (!ids.length) return;
+  const states = creditCardImportPlan.months[month] ||= {};
+  const previous = Object.fromEntries(ids.map((id) => [id, states[id]]));
+  const importedAt = new Date().toISOString();
+  ids.forEach((id) => {
+    states[id] = { status: "imported", importedAt, files: [...(files || [])] };
+  });
+  try {
+    await saveCreditCardImportPlan();
+  } catch (error) {
+    ids.forEach((id) => {
+      if (previous[id] === undefined) delete states[id];
+      else states[id] = previous[id];
+    });
+    throw error;
+  }
+  renderCreditCardImportChecklist();
+}
+
+async function setCreditCardStatementSkipped(month, cardId, skipped) {
+  const states = creditCardImportPlan.months[month] ||= {};
+  const previous = states[cardId];
+  if (skipped) {
+    states[cardId] = { status: "skipped", updatedAt: new Date().toISOString() };
+  } else delete states[cardId];
+  try {
+    await saveCreditCardImportPlan();
+  } catch (error) {
+    if (previous === undefined) delete states[cardId];
+    else states[cardId] = previous;
+    showToast("清單狀態儲存失敗，請確認 Supabase migration 已更新");
+    throw error;
+  }
+  renderCreditCardImportChecklist();
+}
+
+function renderCreditCardImportChecklist() {
+  const monthInput = document.getElementById("cardImportMonth");
+  const rows = document.getElementById("cardImportChecklistRows");
+  if (!monthInput || !rows) return;
+  if (!monthInput.value) monthInput.value = creditCardPlanMonthKey();
+  const month = monthInput.value;
+  const states = creditCardImportPlan.months[month] || {};
+  const currentMonth = month === creditCardPlanMonthKey();
+  const overdue = currentMonth &&
+    new Date().getDate() >= creditCardImportPlan.reminderDay;
+  const pending =
+    creditCardImportPlan.cards.filter((card) => !states[card.id]).length;
+  const reminder = document.getElementById("cardImportReminder");
+  reminder.textContent = pending
+    ? `${pending} 家待匯入 · 每月 ${creditCardImportPlan.reminderDay} 日提醒`
+    : "本月已處理完成";
+  reminder.className = overdue && pending ? "is-overdue" : "";
+  document.getElementById("dataToolsSummary").textContent = overdue && pending
+    ? `資料工具 · ${pending} 家帳單待匯入`
+    : "資料工具";
+  rows.innerHTML = "";
+  creditCardImportPlan.cards.forEach((card) => {
+    const state = states[card.id];
+    const row = document.createElement("div");
+    row.className = "card-import-checklist-row";
+    const status = state?.status === "imported"
+      ? `已匯入 ${new Date(state.importedAt).toLocaleDateString("zh-TW")}`
+      : state?.status === "skipped"
+      ? "本月略過"
+      : overdue
+      ? "待匯入（已到提醒日）"
+      : "待匯入";
+    row.innerHTML = `<div><strong>${
+      escapeHtml(card.name)
+    }</strong><span class="${!state && overdue ? "is-overdue" : ""}">${
+      escapeHtml(status)
+    }</span></div><div class="card-import-row-actions"></div>`;
+    const actions = row.querySelector(".card-import-row-actions");
+    if (state) {
+      const restore = document.createElement("button");
+      restore.type = "button";
+      restore.textContent = "恢復待辦";
+      restore.onclick = () =>
+        setCreditCardStatementSkipped(month, card.id, false).catch(
+          console.error,
+        );
+      actions.appendChild(restore);
+    } else {
+      const importButton = document.createElement("button");
+      importButton.type = "button";
+      importButton.textContent = "匯入";
+      importButton.onclick = () => {
+        document.getElementById("ccBankInput").value = card.name;
+        document.getElementById("ccFile").click();
+      };
+      const skip = document.createElement("button");
+      skip.type = "button";
+      skip.textContent = "本月略過";
+      skip.onclick = () =>
+        setCreditCardStatementSkipped(month, card.id, true).catch(
+          console.error,
+        );
+      actions.append(importButton, skip);
+    }
+    rows.appendChild(row);
+  });
+}
 function snapshotLinkState() {
   const out = {};
   entries.forEach((e) => {
@@ -647,6 +805,7 @@ function render() {
   renderStats();
   renderQualityCard();
   renderImportHistory();
+  renderCreditCardImportChecklist();
   renderAppChrome();
 
   const visible = getFilteredLedgerEntries();

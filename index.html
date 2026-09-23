@@ -146,8 +146,23 @@
             </details>
 
             <details class="compact-tool" id="dataTools">
-              <summary>資料工具</summary>
+              <summary id="dataToolsSummary">資料工具</summary>
               <div class="data-tool-body">
+                <div class="card-import-checklist" id="cardImportChecklist">
+                  <div class="card-import-checklist-head">
+                    <div>
+                      <strong>信用卡帳單</strong><span
+                        id="cardImportReminder"
+                      ></span>
+                    </div>
+                    <input
+                      type="month"
+                      id="cardImportMonth"
+                      aria-label="信用卡帳單月份"
+                    >
+                  </div>
+                  <div id="cardImportChecklistRows"></div>
+                </div>
                 <div class="data-import-grid">
                   <button type="button" id="addInvoiceChoice">
                     匯入發票 CSV

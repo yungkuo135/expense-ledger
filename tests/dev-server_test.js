@@ -43,6 +43,10 @@ Deno.test("本機測試伺服器：只接受帳本使用的固定 storage key", 
   assert(validateStorageKey("expense-entries-2026-08"), "月份 key 被拒絕");
   assert(validateStorageKey("vendor-aliases"), "別名 key 被拒絕");
   assert(
+    validateStorageKey("credit-card-import-plan-v1"),
+    "信用卡帳單清單 key 被拒絕",
+  );
+  assert(
     validateStorageKey("ledger-migration-entries-v1"),
     "遷移標記 key 被拒絕",
   );

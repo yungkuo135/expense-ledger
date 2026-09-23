@@ -58,7 +58,7 @@ const MAX_REQUEST_BYTES = 10 * 1024 * 1024;
 
 export function validateStorageKey(key) {
   return typeof key === "string" &&
-    /^(expense-entries(?:-\d{4}-\d{2})?|vendor-aliases|import-batches-v1|ledger-meta|ledger-migration-entries-v1)$/
+    /^(expense-entries(?:-\d{4}-\d{2})?|vendor-aliases|import-batches-v1|credit-card-import-plan-v1|ledger-meta|ledger-migration-entries-v1)$/
       .test(key);
 }
 
@@ -109,6 +109,11 @@ export function storageStateFromBackup(backup, now = new Date()) {
       ? backup.importBatches.slice(0, 20)
       : [],
   );
+  if (backup.creditCardImportPlan) {
+    values["credit-card-import-plan-v1"] = JSON.stringify(
+      backup.creditCardImportPlan,
+    );
+  }
   return {
     format: "expense-ledger-file-storage",
     version: 1,

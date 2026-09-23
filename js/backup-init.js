@@ -138,6 +138,38 @@ function validateBackupData(data) {
       }
     });
   }
+  if (data.creditCardImportPlan !== undefined) {
+    const plan = data.creditCardImportPlan;
+    const monthEntries = plan && plan.months && typeof plan.months === "object"
+      ? Object.entries(plan.months)
+      : [];
+    const invalid = !plan || typeof plan !== "object" || Array.isArray(plan) ||
+      !Number.isInteger(plan.reminderDay) || plan.reminderDay < 1 ||
+      plan.reminderDay > 31 || !Array.isArray(plan.cards) ||
+      plan.cards.length > 100 || plan.cards.some((card) =>
+        !card || typeof card !== "object" || Array.isArray(card) ||
+        typeof card.id !== "string" || !card.id || card.id.length > 100 ||
+        typeof card.name !== "string" || !card.name || card.name.length > 100
+      ) || !plan.months || typeof plan.months !== "object" ||
+      Array.isArray(plan.months) || monthEntries.length > 120 ||
+      monthEntries.some(([month, states]) =>
+        !/^\d{4}-\d{2}$/.test(month) || !states ||
+        typeof states !== "object" || Array.isArray(states) ||
+        Object.entries(states).some(([cardId, state]) =>
+          typeof cardId !== "string" || cardId.length > 100 || !state ||
+          typeof state !== "object" || Array.isArray(state) ||
+          !["imported", "skipped"].includes(state.status) ||
+          (state.files !== undefined &&
+            (!Array.isArray(state.files) || state.files.length > 100 ||
+              state.files.some((file) =>
+                typeof file !== "string" || file.length > 1000
+              )))
+        )
+      );
+    if (invalid) {
+      throw new Error("信用卡帳單清單資料無效");
+    }
+  }
   return data;
 }
 
@@ -229,6 +261,7 @@ function exportBackup() {
     entries,
     vendorAliases,
     importBatches,
+    creditCardImportPlan,
   };
   const blob = new Blob([JSON.stringify(backup, null, 2)], {
     type: "application/json",
@@ -306,6 +339,25 @@ async function importBackup(file) {
     await saveImportBatches();
   }
 
+  if (data.creditCardImportPlan) {
+    const restored = normalizeCreditCardImportPlan(data.creditCardImportPlan);
+    creditCardImportPlan.reminderDay = restored.reminderDay;
+    restored.cards.forEach((card) => {
+      if (
+        !creditCardImportPlan.cards.some((current) => current.id === card.id)
+      ) {
+        creditCardImportPlan.cards.push(card);
+      }
+    });
+    Object.entries(restored.months).forEach(([month, states]) => {
+      creditCardImportPlan.months[month] = {
+        ...(creditCardImportPlan.months[month] || {}),
+        ...states,
+      };
+    });
+    await saveCreditCardImportPlan();
+  }
+
   await saveEntries();
   await saveVendorAliases();
   reconcile();
@@ -347,8 +399,12 @@ async function clearAll() {
   clearBtnEl.textContent = "清空全部";
   entries = [];
   importBatches = [];
+  creditCardImportPlan = JSON.parse(
+    JSON.stringify(DEFAULT_CREDIT_CARD_IMPORT_PLAN),
+  );
   await saveEntries();
   await saveImportBatches();
+  await saveCreditCardImportPlan();
   render();
   showToast("已清空");
 }
@@ -401,6 +457,7 @@ document.getElementById("clearBtn").addEventListener("click", clearAll);
     if (needsOriginalMigration) await saveEntries();
     await loadVendorAliases();
     await loadImportBatches();
+    await loadCreditCardImportPlan();
   } catch (error) {
     document.body.classList.remove("data-loading");
     modeBanner.style.display = "block";

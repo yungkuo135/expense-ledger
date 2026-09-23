@@ -18,6 +18,20 @@ let dataLoaded = false;
 let vendorAliases = [];
 let vendorAliasGraphCache = null;
 let importBatches = [];
+const DEFAULT_CREDIT_CARD_IMPORT_PLAN = Object.freeze({
+  version: 1,
+  reminderDay: 27,
+  cards: [
+    { id: "sinopac", name: "永豐" },
+    { id: "fubon", name: "富邦" },
+    { id: "cathay", name: "國泰" },
+    { id: "taishin", name: "台新" },
+  ],
+  months: {},
+});
+let creditCardImportPlan = JSON.parse(
+  JSON.stringify(DEFAULT_CREDIT_CARD_IMPORT_PLAN),
+);
 let qualityFilter = null;
 const chipRow = document.getElementById("chipRow");
 const amountInput = document.getElementById("amountInput");

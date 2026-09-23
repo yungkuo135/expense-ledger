@@ -486,6 +486,57 @@ header {
 .bank-label-row input::placeholder {
   color: #b7af98;
 }
+.card-import-checklist {
+  margin-bottom: 14px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fff9ee;
+}
+.card-import-checklist-head,
+.card-import-checklist-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.card-import-checklist-head {
+  margin-bottom: 8px;
+}
+.card-import-checklist-head > div,
+.card-import-checklist-row > div:first-child {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.card-import-checklist-head span,
+.card-import-checklist-row span {
+  color: var(--ink-soft);
+  font-size: 12px;
+}
+.card-import-checklist .is-overdue {
+  color: #b45309;
+  font-weight: 700;
+}
+.card-import-checklist-row {
+  padding: 9px 0;
+  border-top: 1px solid var(--line);
+}
+.card-import-row-actions {
+  display: flex;
+  gap: 6px;
+}
+.card-import-row-actions button {
+  width: auto;
+  padding: 7px 9px;
+  font-size: 12px;
+}
+@media (max-width: 520px) {
+  .card-import-checklist-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
 .import-hint {
   margin-top: 8px;
   font-size: 11px;

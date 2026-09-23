@@ -3,6 +3,8 @@
 以原生 HTML、CSS 與 JavaScript
 製作的個人消費記帳工具。支援現金記帳、政府電子發票與信用卡 CSV
 匯入、重複偵測、發票／信用卡對帳、分類學習、批次回滾，以及 JSON 備份與還原。
+資料工具另有每月信用卡帳單清單；永豐、富邦、國泰與台新會在每月 27 日尚未匯入時
+顯示提醒，匯入成功後自動標記完成，也可將個別銀行標記為本月略過。
 
 > [!IMPORTANT]
 > 此 repository 僅存放程式碼。真實帳務
@@ -30,6 +32,28 @@ deno task dev
 還原資料。`?storage=file` 測試模式不使用 Service Worker。 Manifest、Service
 Worker 與靜態快取使用相對 scope，可部署在 GitHub Pages 的 `/expense-ledger/` 等
 repository 子路徑。
+
+## 每日電子發票同步（macOS）
+
+本機 Playwright 自動化會查詢最近 3 天；跨月時拆成各月份個別查詢，下載財政部
+「載具消費明細」CSV，再透過正式 Expense Ledger 的既有預覽、去重、對帳及批次
+紀錄流程匯入。手機條碼登入含圖形驗證碼，因此每次執行仍需在開啟的 Chrome 視窗
+手動登入；登入後的查詢、下載與匯入會自動完成。
+
+```bash
+deno task invoice:auto
+deno task invoice:schedule:install
+```
+
+第二個指令安裝每天 09:00（台灣本機時間）的 macOS LaunchAgent。若排程時間電腦
+關機，下一次登入 macOS 時會補跑；離線超過 3 天時會拆成多個不超過 3 天且不跨月
+的區間補齊。同一天成功執行後，其餘排程觸發會自動略過。 第一次匯入若 Expense
+Ledger 的 Supabase session 不存在，也需在同一個自動化 Chrome
+視窗登入一次。瀏覽器 profile、 CSV 及排程 log 位於 ignored 的
+`test-fixtures/private/automation`，不得提交到 Git。
+腳本不保存手機條碼帳密，也不會辨識或繞過圖形驗證碼。 排程執行結束後會保留自動化
+Chrome 視窗，方便查看結果；下次排程會重用該視窗。
+不需要時可自行關閉，下次排程仍會重新開啟。
 
 ## 測試
 
@@ -88,6 +112,9 @@ docs/             專案狀態、技術決策與後續待辦
    「雲端已同步」。
 5. 若需將既有本機帳本遷移到全新的空白雲端，可先匯出完整 JSON
    備份，再於雲端模式使用「還原備份」。
+6. 既有 Supabase 環境升級信用卡帳單清單功能時，需執行一次
+   `supabase/migrations/202609230001_allow_credit_card_import_plan.sql`，讓
+   `ledger_storage` 接受新的清單 storage key；全新環境則依序執行所有 migration。
 
 資料表已啟用 Row Level Security；登入者只能讀寫 `user_id` 等於自己 Auth ID
 的資料。JSON 還原會依紀錄 ID 合併，不會清空既有帳本。

@@ -17,6 +17,10 @@ Supabase 遷移已完成，正式模式以 Supabase Auth 登入，並以 Postgre
 - 店家別名學習、歷史分類及 AI 輔助分類流程。
 - 匯入批次回滾、資料品質工作箱與統計。
 - CSV 匯出、完整 JSON 備份及合併式還原。
+- macOS 每日電子發票半自動同步；使用者通過財政部登入驗證後，自動按月份查詢、
+  下載 CSV，並經既有預覽與匯入管線寫入雲端帳本。
+- 每月信用卡帳單待匯入清單；追蹤永豐、富邦、國泰與台新，於每月 27 日提醒，並在
+  成功匯入或手動略過後更新狀態。
 
 首頁目前以消費明細為主；搜尋、篩選、匯入及備份集中在可收合的工具區。發票細項
 預設收合，使用者調整分帳金額後，畫面仍顯示原始金額。
@@ -44,6 +48,8 @@ Supabase 遷移已完成，正式模式以 Supabase Auth 登入，並以 Postgre
 - 前端設定：`js/supabase-config.js`，只允許 Project URL 與 publishable key。
 - Auth／adapter：`js/cloud.js`。
 - migration：`supabase/migrations/202608280001_create_ledger_storage.sql`。
+- 信用卡清單 storage key migration：
+  `supabase/migrations/202609230001_allow_credit_card_import_plan.sql`。
 - 資料表：`public.ledger_storage`。
 - 主鍵：`(user_id, storage_key)`。
 - RLS：authenticated 使用者只能 CRUD 自己 `user_id` 的資料。
@@ -90,4 +96,5 @@ Supabase 後台應維持：
 - 公開註冊關閉，只保留既有個人帳號。
 - Site URL 與 Redirect URLs 對應實際部署網址。
 - migration 已執行且 RLS policies 存在。
+- 正式 Supabase 已於 2026-09-23 執行信用卡清單 storage key migration。
 - service-role key、資料庫密碼未出現在前端或 Git 歷史。
