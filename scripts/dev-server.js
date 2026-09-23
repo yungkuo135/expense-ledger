@@ -34,6 +34,7 @@ const STATIC_ASSETS = new Map([
     "interactions",
     "import-reconciliation",
     "ui",
+    "transaction-workspace",
     "backup-init",
     "pwa",
   ].map((name) => [

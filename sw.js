@@ -1,4 +1,4 @@
-const CACHE_NAME = "expense-ledger-shell-v3";
+const CACHE_NAME = "expense-ledger-shell-v6";
 const APP_SHELL = [
   "./",
   "index.html",
@@ -14,6 +14,7 @@ const APP_SHELL = [
   "js/interactions.js",
   "js/import-reconciliation.js",
   "js/ui.js",
+  "js/transaction-workspace.js",
   "js/backup-init.js",
   "js/pwa.js",
 ].map((path) => new URL(path, self.registration.scope).href);

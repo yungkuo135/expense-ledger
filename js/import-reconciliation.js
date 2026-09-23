@@ -139,7 +139,7 @@ function buildAiClassifyPrompt(names) {
 // a toast-message fragment to append to the import's own toast; empty
 // string when nothing needs classifying (so the import toast stays
 // unchanged in the common case).
-function offerAiClassifyForNewEntries(newIds) {
+function unclassifiedNamesForIds(newIds) {
   const names = new Set();
   newIds.forEach((id) => {
     const e = entries.find((x) => x.id === id);
@@ -147,18 +147,23 @@ function offerAiClassifyForNewEntries(newIds) {
     const name = classifyLookupText(e).trim();
     if (name) names.add(name);
   });
-  if (names.size === 0) return "";
+  return [...names].sort();
+}
+
+function offerAiClassifyForNewEntries(newIds) {
+  const names = unclassifiedNamesForIds(newIds);
+  if (names.length === 0) return "";
 
   if (!rulesExpanded) setRulesExpanded(true);
   document.getElementById("unclassifiedOutput").value = buildAiClassifyPrompt(
-    [...names].sort(),
+    names,
   );
   document.getElementById("aiResultInput").value = "";
   if (typeof rulesCardEl.scrollIntoView === "function") {
     rulesCardEl.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
-  return `,${names.size} 個品項待分類(已列在下方「AI輔助分類」)`;
+  return `,${names.length} 個品項待分類（可從本次新增清單前往處理）`;
 }
 
 // Parse from the RIGHT-HAND category instead of splitting on the first
@@ -745,13 +750,26 @@ async function importInvoiceCSV(fileOrFiles) {
   if (emptyFiles.length) parts.push(`;內容是空的:${emptyFiles.join("、")}`);
   if (historyClassified) parts.push(`,依歷史自動分類 ${historyClassified} 筆`);
   parts.push(offerAiClassifyForNewEntries(newIds));
+  let batch = null;
   if (newIds.length) {
-    createImportBatch("invoice", files, newIds, linkSnapshot, parts.join(""));
+    batch = createImportBatch(
+      "invoice",
+      files,
+      newIds,
+      linkSnapshot,
+      parts.join(""),
+    );
     await saveImportBatches();
     await saveEntries();
     render();
   }
   showToast(parts.join(""));
+  return {
+    batch,
+    addedIds: newIds,
+    summary: parts.join(""),
+    unclassifiedCount: unclassifiedNamesForIds(newIds).length,
+  };
 }
 
 // this user's credit-card CSVs are consistently converted from bank

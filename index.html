@@ -60,8 +60,31 @@
         <strong id="appLoadingLabel">正在開啟帳本</strong>
       </div>
       <header>
-        <div class="title">CASH LEDGER<strong>記帳本</strong></div>
+        <div class="title">
+          <strong id="appTitle">交易</strong>
+        </div>
         <div class="header-actions">
+          <button
+            type="button"
+            id="filterToolsSummary"
+            aria-label="搜尋與篩選"
+            title="搜尋與篩選"
+            aria-expanded="false"
+            aria-controls="filterTools"
+          >
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <circle cx="10.5" cy="10.5" r="6.5"></circle>
+              <path d="m16 16 5 5"></path>
+            </svg>
+          </button>
           <button
             class="header-add-btn"
             id="addActionBtn"
@@ -73,6 +96,27 @@
       </header>
 
       <main>
+        <section
+          class="app-view"
+          id="view-overview"
+          data-view="overview"
+          hidden
+        >
+          <div class="view-heading">
+            <div>
+              <h1>總覽</h1>
+            </div>
+          </div>
+          <div id="dashboard"></div>
+        </section>
+        <section class="app-view" id="view-imports" data-view="imports" hidden>
+          <div class="view-heading">
+            <div>
+              <h1>匯入</h1>
+            </div>
+          </div>
+          <div id="importWorkspace"></div>
+        </section>
         <section class="app-view active" id="view-home" data-view="home">
           <div class="entry-form" id="cashEntryPanel" hidden>
             <div class="panel-title-row">
@@ -112,8 +156,12 @@
           </div>
 
           <div class="home-tool-row">
-            <details class="compact-tool" id="filterTools">
-              <summary id="filterToolsSummary">搜尋與篩選</summary>
+            <label class="month-control">月份 <input
+                type="month"
+                id="monthFilter"
+                aria-label="月份"
+              ></label>
+            <div class="compact-tool" id="filterTools" hidden>
               <div class="filter-card">
                 <div class="search-row">
                   <input
@@ -132,7 +180,6 @@
                   <select id="categoryFilter" aria-label="分類">
                     <option value="all">全部分類</option>
                   </select>
-                  <input type="month" id="monthFilter" aria-label="月份">
                   <select id="reviewFilter" aria-label="處理狀態">
                     <option value="all">全部狀態</option>
                     <option value="pending">信用卡待確認</option>
@@ -141,9 +188,10 @@
                     <option value="matched">已配對</option>
                   </select>
                 </div>
-                <div class="filter-summary" id="filterSummary"></div>
               </div>
-            </details>
+            </div>
+
+            <div class="filter-summary" id="filterSummary"></div>
 
             <details class="compact-tool" id="dataTools">
               <summary id="dataToolsSummary">資料工具</summary>
@@ -312,8 +360,14 @@
       </main>
 
       <nav class="bottom-nav" aria-label="主要導覽">
+        <button type="button" data-nav-view="overview">
+          <span>◫</span>總覽
+        </button>
         <button type="button" data-nav-view="home" class="active">
-          <span>≡</span>帳本
+          <span>≡</span>交易
+        </button>
+        <button type="button" data-nav-view="imports">
+          <span>↓</span>匯入
         </button>
         <button type="button" data-nav-view="inbox">
           <span class="nav-icon-wrap">✓<em
@@ -373,6 +427,7 @@
       </section>
     </div>
 
+    <div class="cash-drawer-backdrop" id="cashDrawer" hidden></div>
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
     <script
       src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.4/dist/umd/supabase.min.js"
@@ -385,6 +440,7 @@
     <script src="js/interactions.js"></script>
     <script src="js/import-reconciliation.js"></script>
     <script src="js/ui.js"></script>
+    <script src="js/transaction-workspace.js"></script>
     <script src="js/backup-init.js"></script>
     <script src="js/pwa.js"></script>
     <script>

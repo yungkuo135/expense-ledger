@@ -1,7 +1,96 @@
 /* ---------- navigation, workbox, filters & import preview ---------- */
 
 let activeView = "home";
+function renderDashboard() {
+  const root = document.getElementById("dashboard");
+  if (!root) return;
+  const now = new Date();
+  const month = creditCardPlanMonthKey(now);
+  const previous = creditCardPlanMonthKey(
+    new Date(now.getFullYear(), now.getMonth() - 1, 1),
+  );
+  const counted = entries.filter(isCounted);
+  const total = (key) =>
+    counted.filter((e) => monthKeyOf(e.date) === key).reduce(
+      (sum, e) => sum + e.amount,
+      0,
+    );
+  const currentTotal = total(month), previousTotal = total(previous);
+  const states = creditCardImportPlan.months[month] || {};
+  const done =
+    creditCardImportPlan.cards.filter((card) => states[card.id]).length;
+  const recent = counted.slice().sort((a, b) =>
+    b.date.localeCompare(a.date) || b.ts - a.ts
+  ).slice(0, 6);
+  root.innerHTML = `
+    <div class="dashboard-metrics">
+      <article class="dashboard-balance"><span>${
+    escapeHtml(month)
+  } · 本月支出</span><strong>${fmt(currentTotal)}</strong><p>上月全月 ${
+    fmt(previousTotal)
+  } · 差額 ${currentTotal - previousTotal >= 0 ? "+" : ""}${
+    fmt(currentTotal - previousTotal)
+  }</p></article>
+      <button class="dashboard-stat" data-go="inbox"><span>待處理</span><strong>${workboxCount()}<small> 筆</small></strong></button>
+      <button class="dashboard-stat" data-go="imports"><span>本月帳單進度</span><strong>${done}<small> / ${creditCardImportPlan.cards.length}</small></strong><span>每月 ${creditCardImportPlan.reminderDay} 日提醒 →</span></button>
+    </div>
+    <div class="dashboard-columns">
+      <section class="dashboard-panel"><div class="dashboard-panel-head"><h2>最近支出</h2><button data-go="home">全部交易 ↗</button></div>
+      ${
+    recent.length
+      ? recent.map((e) =>
+        `<div class="dashboard-transaction"><div><strong>${
+          escapeHtml(e.vendor || e.note || e.category)
+        }</strong><span>${escapeHtml(e.date)} · ${
+          escapeHtml(e.category)
+        }</span></div><b>${fmt(e.amount)}</b></div>`
+      ).join("")
+      : '<p class="workspace-description">尚無紀錄</p>'
+  }</section>
+      <section class="dashboard-panel"><div class="dashboard-panel-head"><h2>本月帳單</h2><button data-go="imports">管理 ↗</button></div>${
+    creditCardImportPlan.cards.map((card) =>
+      `<div class="dashboard-bank"><span>${
+        escapeHtml(card.name)
+      }</span><span class="dashboard-bank-status">${
+        states[card.id]?.status === "imported"
+          ? "已匯入"
+          : states[card.id]?.status === "skipped"
+          ? "本月略過"
+          : "待匯入"
+      }</span></div>`
+    ).join("")
+  }</section>
+    </div>`;
+  root.querySelectorAll("[data-go]").forEach((button) => {
+    button.onclick = () => setActiveView(button.dataset.go);
+  });
+}
 let importPreviewState = null;
+let invoiceImportResult = null;
+
+function showInvoiceImportResult(result) {
+  clearLedgerFilter("all");
+  invoiceImportResult = {
+    ...result,
+    unclassifiedCount: result.unclassifiedCount ??
+      unclassifiedNamesForIds(result.addedIds || []).length,
+  };
+  selectedTransactionId = null;
+  setActiveView("home");
+  render();
+}
+
+function openImportedUnclassified() {
+  qualityFilter = "unclassified";
+  setActiveView("inbox");
+  render();
+  setRulesExpanded(true);
+  setTimeout(() =>
+    document.getElementById("aiWorkflow").scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    }), 0);
+}
 const ledgerFilters = {
   source: "all",
   category: "all",
@@ -34,8 +123,12 @@ function workboxCount() {
 }
 
 function setActiveView(view) {
-  const allowed = new Set(["home", "inbox", "stats"]);
+  const allowed = new Set(["home", "imports", "inbox", "stats"]);
   activeView = allowed.has(view) ? view : "home";
+  document.getElementById("appTitle").textContent = activeView === "home"
+    ? "交易"
+    : "記帳本";
+  document.getElementById("filterToolsSummary").hidden = activeView !== "home";
   document.querySelectorAll(".app-view").forEach((section) => {
     const active = section.getAttribute("data-view") === activeView;
     section.hidden = !active;
@@ -51,7 +144,8 @@ function setActiveView(view) {
 }
 
 function openCashEntry() {
-  setActiveView("home");
+  document.getElementById("cashDrawer").hidden = false;
+  document.body.classList.add("cash-drawer-open");
   const panel = document.getElementById("cashEntryPanel");
   panel.hidden = false;
   setTimeout(() => amountInput.focus(), 0);
@@ -59,6 +153,9 @@ function openCashEntry() {
 
 function closeCashEntry() {
   document.getElementById("cashEntryPanel").hidden = true;
+  document.getElementById("cashDrawer").hidden = true;
+  document.body.classList.remove("cash-drawer-open");
+  document.getElementById("addActionBtn").focus();
 }
 
 function reviewFilterMatches(entry, filter) {
@@ -77,11 +174,17 @@ function reviewFilterMatches(entry, filter) {
 }
 
 function getFilteredLedgerEntries() {
+  const resultIds = invoiceImportResult
+    ? new Set(
+      invoiceImportResult.batch?.undone ? [] : invoiceImportResult.addedIds,
+    )
+    : null;
   // Matched credit-card rows stay represented by their invoice group, exactly
   // as before, so filtering never creates a second copy of the same purchase.
   return entries.filter((entry) =>
     !(entry.source === "creditcard" && entry.matchedId)
   ).filter((entry) => {
+    if (resultIds && !resultIds.has(entry.id)) return false;
     if (searchQuery) {
       const hay = [
         entry.note,
@@ -109,7 +212,8 @@ function getFilteredLedgerEntries() {
 }
 
 function hasActiveLedgerFilters() {
-  return !!searchQuery || ledgerFilters.source !== "all" ||
+  return !!invoiceImportResult || !!searchQuery ||
+    ledgerFilters.source !== "all" ||
     ledgerFilters.category !== "all" || !!ledgerFilters.month ||
     ledgerFilters.review !== "all";
 }
@@ -118,6 +222,7 @@ function renderFilterSummary() {
   const wrap = document.getElementById("filterSummary");
   const toolSummary = document.getElementById("filterToolsSummary");
   const labels = [];
+  if (invoiceImportResult) labels.push(["importResult", "本次新增發票"]);
   if (searchQuery) labels.push(["search", `搜尋：${searchInput.value.trim()}`]);
   if (ledgerFilters.source !== "all") {
     labels.push([
@@ -138,11 +243,17 @@ function renderFilterSummary() {
     ]);
   }
   if (!labels.length) {
-    toolSummary.textContent = "搜尋與篩選";
-    wrap.innerHTML = '<span class="filter-empty">目前顯示全部明細</span>';
+    toolSummary.setAttribute("aria-label", "搜尋與篩選");
+    toolSummary.title = "搜尋與篩選";
+    toolSummary.classList.remove("has-filters");
+    wrap.innerHTML = "";
+    wrap.hidden = true;
     return;
   }
-  toolSummary.textContent = `搜尋與篩選・${labels.length} 個條件`;
+  toolSummary.setAttribute("aria-label", `搜尋與篩選・${labels.length} 個條件`);
+  toolSummary.title = `搜尋與篩選・${labels.length} 個條件`;
+  toolSummary.classList.add("has-filters");
+  wrap.hidden = false;
   wrap.innerHTML =
     labels.map(([key, label]) =>
       `<button type="button" data-clear-filter="${key}">${
@@ -157,6 +268,7 @@ function renderFilterSummary() {
 }
 
 function clearLedgerFilter(key) {
+  if (key === "all" || key === "importResult") invoiceImportResult = null;
   if (key === "all" || key === "search") {
     searchQuery = "";
     searchInput.value = "";
@@ -405,8 +517,10 @@ async function confirmImportPreview() {
   button.disabled = true;
   button.textContent = "匯入中…";
   try {
-    if (state.type === "invoice") await importInvoiceCSV(state.files);
-    else {
+    let invoiceResult = null;
+    if (state.type === "invoice") {
+      invoiceResult = await importInvoiceCSV(state.files);
+    } else {
       await importCreditCardCSV(
         state.files,
         state.bankLabel,
@@ -415,6 +529,10 @@ async function confirmImportPreview() {
     }
     document.getElementById("importPreviewBackdrop").hidden = true;
     importPreviewState = null;
+    if (invoiceResult) {
+      showInvoiceImportResult(invoiceResult);
+      return;
+    }
     const hasUnclassified = qualityBuckets().unclassified.length > 0;
     if (hasUnclassified) {
       qualityFilter = "unclassified";
@@ -442,6 +560,54 @@ async function confirmImportPreview() {
 }
 
 function initializeUI() {
+  document.getElementById("view-overview").hidden = true;
+  document.getElementById("view-stats").appendChild(
+    document.getElementById("dashboard"),
+  );
+  document.querySelector('[data-nav-view="overview"]').remove();
+  const filters = document.getElementById("filterTools");
+  filters.hidden = true;
+  const searchToggle = document.getElementById("filterToolsSummary");
+  searchToggle.addEventListener("click", () => {
+    filters.hidden = !filters.hidden;
+    searchToggle.setAttribute("aria-expanded", String(!filters.hidden));
+    if (!filters.hidden) searchInput.focus({ preventScroll: true });
+  });
+  filters.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") return;
+    filters.hidden = true;
+    searchToggle.setAttribute("aria-expanded", "false");
+    searchToggle.focus({ preventScroll: true });
+  });
+  const tools = document.getElementById("dataTools");
+  document.getElementById("importWorkspace").appendChild(tools);
+  tools.open = true;
+  const drawer = document.getElementById("cashDrawer");
+  const cashPanel = document.getElementById("cashEntryPanel");
+  drawer.appendChild(cashPanel);
+  cashPanel.setAttribute("role", "dialog");
+  cashPanel.setAttribute("aria-modal", "true");
+  cashPanel.setAttribute("aria-label", "新增現金支出");
+  drawer.addEventListener("click", (event) => {
+    if (event.target === drawer) closeCashEntry();
+  });
+  document.addEventListener("keydown", (event) => {
+    if (drawer.hidden) return;
+    if (event.key === "Escape") closeCashEntry();
+    if (event.key === "Tab") {
+      const controls = [...cashPanel.querySelectorAll("button, input")].filter((
+        el,
+      ) => !el.disabled);
+      const first = controls[0], last = controls[controls.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+  });
   const categoryFilter = document.getElementById("categoryFilter");
   CATEGORIES.forEach((category) => {
     const option = document.createElement("option");

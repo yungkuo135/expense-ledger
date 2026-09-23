@@ -656,6 +656,18 @@ function renderImportHistory() {
       }>復原</button>`;
     const btn = row.querySelector(".undo-batch-btn");
     if (!btn.disabled) btn.onclick = () => undoImportBatch(batch.id);
+    if (batch.type === "invoice" && !batch.undone) {
+      const view = document.createElement("button");
+      view.type = "button";
+      view.textContent = "查看新增消費";
+      view.onclick = () =>
+        showInvoiceImportResult({
+          batch,
+          addedIds: batch.addedIds || [],
+          summary: batch.summary || "",
+        });
+      row.appendChild(view);
+    }
     list.appendChild(row);
   });
 }
@@ -801,7 +813,8 @@ function renderSearchResults(visible) {
   attachLedgerHandlers();
 }
 
-function render() {
+function renderClassicLedger() {
+  renderDashboard();
   renderStats();
   renderQualityCard();
   renderImportHistory();
